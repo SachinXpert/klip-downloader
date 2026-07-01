@@ -135,6 +135,11 @@ app.post('/api/info', (req, res) => {
     '--no-playlist',
     '--no-warnings',
     '--skip-download',
+    // Without an explicit -f, yt-dlp tries its default selector
+    // (bestvideo*+bestaudio) which fails for some videos.
+    // This chain always finds something — JSON still includes
+    // ALL formats in the formats[] array regardless of -f.
+    '-f', 'bestvideo+bestaudio/bestvideo/bestaudio/best',
     ...antiBotArgs(),
     url
   ];
@@ -288,6 +293,7 @@ app.get('/api/debug', (req, res) => {
   const botArgs = antiBotArgs();
   const allArgs = [
     '--dump-json','--no-playlist','--no-warnings','--skip-download',
+    '-f', 'bestvideo+bestaudio/bestvideo/bestaudio/best',
     ...botArgs, url
   ];
 
