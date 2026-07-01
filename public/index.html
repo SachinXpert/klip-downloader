@@ -499,17 +499,14 @@ let t=0;
 let S={url:'',info:null,mode:'video',vq:'1080',aq:'320',avail:null,audioSizes:null};
 
 /* ════════════════════════════════════════════
-   QUALITY LABELS (friendly names for known tiers —
-   actual availability always comes from the server)
+   QUALITY LABELS (friendly display names)
 ════════════════════════════════════════════ */
-const VQ=[
-  {l:'4K',   v:'2160'},
-  {l:'1440p',v:'1440'},
-  {l:'1080p',v:'1080'},
-  {l:'720p', v:'720'},
-  {l:'480p', v:'480'},
-  {l:'360p', v:'360'},
-];
+const HEIGHT_LABEL = {
+  2160:'4K',1440:'1440p',1080:'1080p',
+  720:'720p',480:'480p',360:'360p',240:'240p',144:'144p'
+};
+function qLabel(h){ return HEIGHT_LABEL[h] || (h+'p'); }
+
 const AQ=[
   {l:'320k',v:'320'},
   {l:'256k',v:'256'},
@@ -518,9 +515,10 @@ const AQ=[
 
 function fmtBytes(b){
   if(!b) return '';
-  if(b>=1e9) return (b/1e9).toFixed(1)+' GB';
-  if(b>=1e6) return Math.round(b/1e6)+' MB';
-  if(b>=1e3) return Math.round(b/1e3)+' KB';
+  // ~ prefix = estimate (actual download may vary slightly)
+  if(b>=1e9) return '~'+(b/1e9).toFixed(1)+' GB';
+  if(b>=1e6) return '~'+Math.round(b/1e6)+' MB';
+  if(b>=1e3) return '~'+Math.round(b/1e3)+' KB';
   return '';
 }
 
@@ -530,19 +528,15 @@ function fmtBytes(b){
    (e.g. 4K on a 1080p upload) is never shown.
 ════════════════════════════════════════════ */
 function renderGrids(){
-  const avail = (S.avail && S.avail.length) ? S.avail : VQ.map(q=>({height:parseInt(q.v),bytes:0}));
+  const avail = (S.avail && S.avail.length) ? S.avail : [{height:1080,bytes:0},{height:720,bytes:0}];
 
-  const vList = avail.map(a=>{
-    const known = VQ.find(q=>parseInt(q.v)===a.height);
-    return { v:String(a.height), l:known?known.l:(a.height+'p'), bytes:a.bytes };
-  });
-
-  document.getElementById('vGrid').innerHTML = vList.map((q,i)=>`
-    <div class="q ${i===0?'best-tier':''} ${S.mode==='video'&&S.vq===q.v?'v-sel':''}" onclick="pick('${q.v}','v')" tabindex="0">
+  document.getElementById('vGrid').innerHTML = avail.map((a,i)=>`
+    <div class="q ${i===0?'best-tier':''} ${S.mode==='video'&&S.vq===String(a.height)?'v-sel':''}"
+         onclick="pick('${a.height}','v')" tabindex="0">
       <div class="q-ck">✓</div>
-      <div class="q-n">${q.l}</div>
+      <div class="q-n">${qLabel(a.height)}</div>
       ${i===0?'<div class="q-best">Best</div>':''}
-      <div class="q-fmt">MP4${q.bytes?' · '+fmtBytes(q.bytes):''}</div>
+      <div class="q-fmt">MP4${a.bytes?' · '+fmtBytes(a.bytes):''}</div>
     </div>`).join('');
 
   document.getElementById('aGrid').innerHTML = AQ.map(q=>{
@@ -555,14 +549,14 @@ function renderGrids(){
     </div>`;
   }).join('');
 
-  const btn=document.getElementById('dlBtn'),t=document.getElementById('dlTxt');
+  const btn=document.getElementById('dlBtn'), txt=document.getElementById('dlTxt');
   if(S.mode==='audio'){
     btn.className='dl-btn a-mode';
-    t.textContent=`Download MP3 ${S.aq}kbps`;
+    txt.textContent=`Download MP3 ${S.aq}kbps`;
   } else {
+    const match=avail.find(x=>String(x.height)===S.vq);
     btn.className='dl-btn v-mode';
-    const match=vList.find(x=>x.v===S.vq);
-    t.textContent=`Download ${match?match.l:S.vq+'p'} MP4`;
+    txt.textContent=`Download ${match?qLabel(match.height):S.vq+'p'} MP4`;
   }
 }
 
@@ -618,7 +612,6 @@ async function analyze(){
     S.audioSizes=data.audioSizes||{};
     S.mode='video';
     S.vq=String((S.avail[0]&&S.avail[0].height)||1080);
-
     fillInfo(data);
     show();
     toast('Video found — pick a quality below','inf');
@@ -644,7 +637,7 @@ function fillInfo({id,title,author,thumbnail,duration,views,isShort,qualities}){
   if(isShort)  chips.push('📱 Short');
   document.getElementById('vmrow').innerHTML=chips.map(c=>`<span class="v-chip">${c}</span>`).join('');
 
-  const top = (qualities && qualities[0]) ? qualities[0].height+'p' : 'HD';
+  const top = (qualities && qualities[0]) ? qLabel(qualities[0].height) : 'HD';
   const tags=[`Up to ${top}`,'MP3 available','No watermark'];
   document.getElementById('vtags').innerHTML=tags.map(t=>`<span class="v-tag">${t}</span>`).join('');
 }
@@ -656,91 +649,80 @@ function show(){
 }
 
 /* ════════════════════════════════════════════
-   DOWNLOAD — real progress via streamed fetch
+   DOWNLOAD — direct browser download
+   We simply point the browser at the server URL.
+   The browser opens its native download bar/manager,
+   shows real progress, and saves straight to disk.
+   No RAM buffering, no blob URLs, no memory issues.
 ════════════════════════════════════════════ */
-async function startDL(){
+function startDL(){
   if(!S.url){toast('Please analyze a video first','err');return;}
 
-  const btn=document.getElementById('dlBtn');
-  const dlTxt=document.getElementById('dlTxt');
-  const prog=document.getElementById('prog');
-  const pfill=document.getElementById('pfill');
-  const pmsg=document.getElementById('pmsg');
-  const ppct=document.getElementById('ppct');
+  const btn    = document.getElementById('dlBtn');
+  const dlTxt  = document.getElementById('dlTxt');
+  const prog   = document.getElementById('prog');
+  const pfill  = document.getElementById('pfill');
+  const pmsg   = document.getElementById('pmsg');
+  const ppct   = document.getElementById('ppct');
 
-  const isAudio=S.mode==='audio';
-  btn.disabled=true;
-  dlTxt.innerHTML=`<div class="spin${isAudio?' lt':''}"></div> Preparing…`;
+  const isAudio = S.mode === 'audio';
+  const params  = new URLSearchParams({
+    url:     S.url,
+    quality: S.vq,
+    mode:    S.mode,
+    bitrate: S.aq
+  });
+  const dlUrl = `/api/download?${params}`;
+
+  // Show indeterminate progress — server is running yt-dlp
+  btn.disabled = true;
+  dlTxt.innerHTML = `<div class="spin${isAudio?' lt':''}"></div> Starting…`;
   prog.classList.add('on');
-  pfill.classList.remove('indeterminate');
-  pfill.style.width='0%';
-  pmsg.textContent='Connecting…';
-  ppct.textContent='';
+  pfill.className  = 'prog-fill indeterminate';
+  pmsg.textContent = 'Server is processing your video…';
+  ppct.textContent = '';
 
-  const params=new URLSearchParams({url:S.url,quality:S.vq,mode:S.mode,bitrate:S.aq});
-  const dlUrl=`/api/download?${params}`;
+  // Cycle through status messages while server works
+  const msgs = [
+    'Downloading from YouTube…',
+    'Merging video + audio…',
+    'Preparing your file…',
+    'Almost ready…'
+  ];
+  let mi = 0;
+  const msgTimer = setInterval(() => {
+    pmsg.textContent = msgs[mi % msgs.length]; mi++;
+  }, 4000);
 
-  try{
-    const res=await fetch(dlUrl);
-    if(!res.ok){
-      let msg="Couldn't complete this download — please try again.";
-      try{ const j=await res.json(); if(j.error) msg=j.error; }catch{}
-      throw new Error(msg);
-    }
+  // ── THE ACTUAL DOWNLOAD ──────────────────────────────────
+  // Creating a hidden <a> with the server URL and clicking it
+  // hands control to the browser's own download engine.
+  // The file streams directly from server → disk.
+  // Browser download bar shows real progress + speed + ETA.
+  const a = document.createElement('a');
+  a.href            = dlUrl;
+  a.download        = '';      // browser picks filename from Content-Disposition
+  a.style.display   = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 
-    const total=parseInt(res.headers.get('Content-Length')||'0',10);
-    const reader=res.body.getReader();
-    const chunks=[];
-    let received=0;
+  toast('Download started — check your browser\'s download bar ↓','ok');
 
-    dlTxt.innerHTML=`<div class="spin${isAudio?' lt':''}"></div> Downloading…`;
-    pmsg.textContent='Downloading…';
-    if(!total) pfill.classList.add('indeterminate');
-
-    while(true){
-      const {done,value}=await reader.read();
-      if(done) break;
-      chunks.push(value);
-      received+=value.length;
-      if(total){
-        const pct=Math.min(99,Math.round((received/total)*100));
-        pfill.style.width=pct+'%';
-        ppct.textContent=pct+'%';
-      }
-    }
-
-    const blob=new Blob(chunks);
-    const cd=res.headers.get('Content-Disposition')||'';
-    const m=cd.match(/filename="([^"]+)"/);
-    const filename=m?m[1]:(isAudio?'klip-audio.mp3':'klip-video.mp4');
-
-    const blobUrl=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=blobUrl; a.download=filename; a.style.display='none';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(()=>URL.revokeObjectURL(blobUrl),4000);
-
-    pfill.classList.remove('indeterminate');
-    pfill.style.width='100%';
-    ppct.textContent='100%';
-    pmsg.textContent='Done!';
-    dlTxt.innerHTML='Downloaded ✓';
-    toast('Your download has started ✓','ok');
-
-  } catch(err){
-    pfill.style.width='0%';
-    pfill.classList.remove('indeterminate');
-    pmsg.textContent='Failed';
-    toast(err.message,'err');
-  } finally{
-    setTimeout(()=>{
-      btn.disabled=false;
+  // Reset UI after a short delay
+  setTimeout(() => {
+    clearInterval(msgTimer);
+    pfill.className  = 'prog-fill';
+    pfill.style.width = '100%';
+    pmsg.textContent = 'File sent to your browser ✓';
+    ppct.textContent = '';
+    setTimeout(() => {
+      btn.disabled      = false;
       prog.classList.remove('on');
-      pfill.style.width='0%';
-      ppct.textContent='';
+      pfill.style.width = '0%';
       renderGrids();
-    },2200);
-  }
+    }, 2000);
+  }, 6000);
 }
 
 /* ════════════════════════════════════════════
