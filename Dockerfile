@@ -1,36 +1,29 @@
-# ── KLIP YouTube Downloader ──────────────────────────────
-# Base image: Node.js 20 (slim)
+# ── KLIP YouTube Downloader ──────────────────────────────────
 FROM node:20-slim
 
-# Install Python, ffmpeg, and the LATEST yt-dlp
-# (-U forces newest version — old yt-dlp breaks against YouTube often)
+# Install ffmpeg + curl + python (minimal)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        python3 \
-        python3-pip \
         ffmpeg \
         curl \
-        ca-certificates && \
-    pip3 install --no-cache-dir -U yt-dlp --break-system-packages && \
+        ca-certificates \
+        python3 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
-WORKDIR /app
+# Download yt-dlp BINARY directly from GitHub releases
+# This is always the absolute latest stable release —
+# much faster and more up-to-date than pip.
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
+        -o /usr/local/bin/yt-dlp && \
+    chmod a+rx /usr/local/bin/yt-dlp && \
+    yt-dlp --version
 
-# Copy package.json first (for Docker layer caching)
+# App setup
+WORKDIR /app
 COPY package.json ./
 RUN npm install --omit=dev
-
-# Copy all files
-# (optionally include cookies.txt here too — see DEPLOY_GUIDE)
 COPY . .
 
-# Expose port (Railway overrides via $PORT at runtime)
 EXPOSE 3001
 
-# Health check — uses $PORT so it works on Railway's dynamic port
-HEALTHCHECK --interval=30s --timeout=10s \
-  CMD curl -f http://localhost:${PORT:-3001}/api/health || exit 1
-
-# Start server
 CMD ["node", "server.js"]
