@@ -121,7 +121,10 @@ if (process.env.YT_COOKIES) {
 }
 
 function antiBotArgs() {
-  const args = ['--extractor-args', 'youtube:player_client=android,web'];
+  const args = [
+    '--extractor-args', 'youtube:player_client=ios,web',
+    '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iPhone OS 17_5_1 like Mac OS X)',
+  ];
   if (COOKIES_PATH) args.push('--cookies', COOKIES_PATH);
   return args;
 }
