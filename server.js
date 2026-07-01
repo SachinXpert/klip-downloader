@@ -81,12 +81,36 @@ function findFile(p) {
     .map(f=>path.join(os.tmpdir(),f))[0]||null;
 }
 function cleanup(f) { try { if(f&&fs.existsSync(f)) fs.unlinkSync(f); } catch {} }
+
+const BPS = {2160:35000,1440:16000,1080:8000,720:5000,480:2500,360:1000};
+function estBytes(h,d) { return Math.round(((BPS[h]||1500)*1000/8)*(d||0)); }
+
 function heightOf(f) {
   if (!f?.height) return null;
   return Math.min(f.height, f.width||f.height);
 }
-const BPS = {2160:35000,1440:16000,1080:8000,720:5000,480:2500,360:1000};
-function estBytes(h,d) { return Math.round(((BPS[h]||1500)*1000/8)*(d||0)); }
+// Standard YouTube resolution heights — only these are shown in the UI.
+// Non-standard yt-dlp format variants (428p, 960p, etc.) get mapped
+// to the nearest standard or dropped.
+const STD_H = new Set([144, 240, 360, 480, 720, 1080, 1440, 2160]);
+
+function heightOf(f) {
+  if (!f) return null;
+
+  // 1. format_note is the authoritative label YouTube assigns each stream
+  //    e.g. "1080p", "1080p60", "2160p", "720p", "480p", "360p", "144p"
+  //    This avoids the width-vs-height confusion entirely.
+  if (f.format_note) {
+    const m = String(f.format_note).match(/^(\d+)p/);
+    if (m) return parseInt(m[1]);
+  }
+
+  // 2. Fall back to geometry — always use the SHORTER side for the "p" label
+  const h = f.height || 0;
+  const w = f.width  || 0;
+  if (h && w) return Math.min(h, w);
+  return h || null;
+}
 function publicError(s) {
   if (/Sign in|bot|verif/i.test(s))    return 'This video is temporarily unavailable. Please try again shortly.';
   if (/Private video/i.test(s))         return 'This video is private.';
@@ -154,21 +178,52 @@ app.post('/api/info', (req, res) => {
       const v = JSON.parse(out.trim());
       const dur = v.duration || 0;
 
-      // Build quality list from real formats
+      // Build quality list from real formats — standard heights only.
+      // format_note ensures we get labels YouTube actually uses (1080p, 720p…)
+      // rather than raw pixel dimensions (1920, 1280…).
       const sizeMap = {};
+      let bestAudioBytes = 0; // audio stream added to each video size below
+
       (v.formats||[]).forEach(f => {
-        if (!f.vcodec||f.vcodec==='none') return;
+        const isVideoOnly = f.vcodec && f.vcodec !== 'none';
+        const isAudioOnly = (!f.vcodec || f.vcodec === 'none') && f.acodec && f.acodec !== 'none';
+
+        if (isAudioOnly) {
+          const sz = f.filesize || f.filesize_approx || 0;
+          if (sz > bestAudioBytes) bestAudioBytes = sz;
+          return;
+        }
+
+        if (!isVideoOnly) return;
         const h = heightOf(f); if (!h) return;
-        const sz = f.filesize||f.filesize_approx||0;
-        if (!sizeMap[h]||sz>sizeMap[h]) sizeMap[h]=sz;
+
+        // Only standard heights — skip non-standard variants (428p, 960p, etc.)
+        if (!STD_H.has(h)) return;
+
+        const sz = f.filesize || f.filesize_approx || 0;
+        if (!sizeMap[h] || sz > sizeMap[h]) sizeMap[h] = sz;
       });
 
+      // If no standard heights detected, fall back to all heights
+      if (!Object.keys(sizeMap).length) {
+        (v.formats||[]).forEach(f => {
+          if (!f.vcodec || f.vcodec === 'none') return;
+          const h = heightOf(f); if (!h) return;
+          const sz = f.filesize || f.filesize_approx || 0;
+          if (!sizeMap[h] || sz > sizeMap[h]) sizeMap[h] = sz;
+        });
+      }
+
       let qualities = Object.keys(sizeMap).map(Number)
-        .sort((a,b)=>b-a)
-        .map(h=>({height:h, bytes:sizeMap[h]||estBytes(h,dur)}));
+        .sort((a,b) => b-a)
+        .map(h => ({
+          height: h,
+          // Combined size = video stream + audio stream (what yt-dlp actually downloads)
+          bytes: (sizeMap[h] || estBytes(h,dur)) + (bestAudioBytes || Math.round((192000/8)*dur))
+        }));
 
       if (!qualities.length)
-        qualities=[1080,720,480,360].map(h=>({height:h,bytes:estBytes(h,dur)}));
+        qualities = [1080,720,480,360].map(h=>({height:h, bytes:estBytes(h,dur)}));
 
       const audioSizes={};
       [320,256,128].forEach(k=>{audioSizes[k]=Math.round((k*1000/8)*dur);});
