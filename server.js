@@ -11,6 +11,12 @@
  *    pip install yt-dlp
  *    apt install ffmpeg   (or brew install ffmpeg on Mac)
  *    npm install
+ *
+ *  NOTE: every res.json({error: ...}) string below is shown
+ *  directly to PUBLIC visitors — keep them simple and free of
+ *  implementation details (yt-dlp, cookies, server, etc).
+ *  Use console.error/log for anything technical — that only
+ *  shows up in YOUR Railway logs, never on the website.
  */
 
 const express   = require('express');
@@ -36,7 +42,7 @@ function rateLimit(req, res, next) {
   if (now - win.start > 60000) { win.count = 0; win.start = now; }
   win.count++;
   rateLimitMap.set(ip, win);
-  if (win.count > 5) return res.status(429).json({ error: 'Too many requests. Wait a minute.' });
+  if (win.count > 5) return res.status(429).json({ error: "You're going a bit fast — please wait a minute and try again." });
   next();
 }
 
@@ -80,6 +86,21 @@ function cleanup(file) {
   try { if (file && fs.existsSync(file)) fs.unlinkSync(file); } catch {}
 }
 
+// Normalizes a format's resolution to a conventional "p" value,
+// correctly handling portrait Shorts (where height > width).
+function heightOf(f) {
+  if (!f || !f.height) return null;
+  return Math.min(f.height, f.width || f.height);
+}
+
+// Rough kbps-per-resolution table, used ONLY as a fallback when
+// YouTube doesn't report a real filesize for that stream.
+const BITRATE_GUESS = { 2160:35000, 1440:16000, 1080:8000, 720:5000, 480:2500, 360:1000, 240:700, 144:400 };
+function estimateBytes(height, durSec) {
+  const kbps = BITRATE_GUESS[height] || 1500;
+  return Math.round((kbps * 1000 / 8) * (durSec || 0));
+}
+
 // ─── Anti-bot-detection setup ─────────────────────────────────
 // YouTube blocks cloud/datacenter IPs (Railway, AWS, etc.) more
 // aggressively than home IPs. Two mitigations:
@@ -105,24 +126,24 @@ function antiBotArgs() {
   return args;
 }
 
-// Turn raw yt-dlp stderr into a clear, honest message for the UI
+// Raw yt-dlp stderr → clean, PUBLIC-safe message (no tech jargon).
+// Full raw stderr is still console.error'd separately for your logs.
 function explainError(stderr) {
-  if (/Sign in to confirm/i.test(stderr)) {
-    return "YouTube blocked this server's IP as a bot. Add a cookies.txt file (see DEPLOY_GUIDE) to fix this permanently.";
-  }
-  if (/Private video/i.test(stderr)) return 'This video is private.';
-  if (/Video unavailable/i.test(stderr)) return 'This video was deleted or is unavailable.';
-  if (/age[- ]restrict/i.test(stderr)) return 'Age-restricted video — needs cookies.txt to download.';
-  if (/HTTP Error 429/i.test(stderr)) return 'Too many requests right now — wait a minute and retry.';
-  return 'Could not process this video. Server may need a yt-dlp update.';
+  if (/Sign in to confirm/i.test(stderr))   return "This video can't be processed right now. Please try again shortly.";
+  if (/Private video/i.test(stderr))        return 'This video is private and cannot be downloaded.';
+  if (/Video unavailable/i.test(stderr))    return 'This video was deleted or is unavailable.';
+  if (/age[- ]restrict/i.test(stderr))      return 'This video is age-restricted and cannot be downloaded.';
+  if (/HTTP Error 429/i.test(stderr))       return "You're going a bit fast — please wait a moment and try again.";
+  if (/copyright/i.test(stderr))            return 'This video is blocked due to a copyright claim.';
+  return "Something went wrong with this video. Please try again or use a different link.";
 }
 
 // ─── POST /api/info ────────────────────────────────────────
-// Fetch video metadata using yt-dlp (no external API)
+// Fetch video metadata + REAL available qualities + real sizes
 app.post('/api/info', (req, res) => {
   const { url } = req.body;
   if (!url || !isYouTube(url)) {
-    return res.status(400).json({ error: 'Please enter a valid YouTube URL.' });
+    return res.status(400).json({ error: 'Please enter a valid YouTube link.' });
   }
 
   let stdout = '';
@@ -147,24 +168,57 @@ app.post('/api/info', (req, res) => {
     }
     try {
       const v = JSON.parse(stdout);
+      const durSec = v.duration || 0;
+
+      // Only report resolutions that ACTUALLY exist for this video —
+      // this is what stops the UI from ever offering a fake quality.
+      // Use the real filesize from YouTube when available, otherwise
+      // fall back to a reasonable estimate based on duration.
+      const sizeByHeight = {};
+      (v.formats || []).forEach(f => {
+        if (!f.vcodec || f.vcodec === 'none') return;
+        const h = heightOf(f);
+        if (!h) return;
+        const sz = f.filesize || f.filesize_approx || 0;
+        if (!sizeByHeight[h] || sz > sizeByHeight[h]) sizeByHeight[h] = sz;
+      });
+
+      let qualities = Object.keys(sizeByHeight)
+        .map(h => parseInt(h))
+        .sort((a, b) => b - a)
+        .map(h => ({ height: h, bytes: sizeByHeight[h] || estimateBytes(h, durSec) }));
+
+      if (!qualities.length) {
+        qualities = [1080, 720, 480, 360].map(h => ({ height: h, bytes: estimateBytes(h, durSec) }));
+      }
+
+      const audioSizes = {};
+      [320, 256, 128].forEach(kbps => {
+        audioSizes[kbps] = Math.round((kbps * 1000 / 8) * durSec);
+      });
+
       res.json({
         id:        v.id,
         title:     v.title,
-        author:    v.uploader || v.channel || 'Unknown Channel',
+        author:    v.uploader || v.channel || 'Unknown creator',
         thumbnail: v.thumbnail,
-        duration:  fmtTime(v.duration),
+        duration:  fmtTime(durSec),
         views:     fmtViews(v.view_count),
-        isShort:   (v.duration || 999) <= 60
+        isShort:   durSec > 0 && durSec <= 60,
+        qualities,
+        audioSizes
       });
-      console.log(`[INFO] "${v.title}" — ${fmtTime(v.duration)}`);
-    } catch {
-      res.status(500).json({ error: 'Could not read video data.' });
+      console.log(`[INFO] "${v.title}" — up to ${qualities[0].height}p`);
+    } catch (e) {
+      console.error('[INFO PARSE FAIL]', e.message);
+      res.status(500).json({ error: 'Could not read this video — please try again.' });
     }
   });
 
-  proc.on('error', () => res.status(500).json({
-    error: 'yt-dlp not found on server. Run: pip install yt-dlp'
-  }));
+  proc.on('error', (e) => {
+    console.error('[INFO SPAWN FAIL]', e.message);
+    res.status(500).json({ error: 'Something went wrong. Please try again in a moment.' });
+  });
 });
 
 // ─── GET /api/download ─────────────────────────────────────
@@ -173,7 +227,7 @@ app.get('/api/download', rateLimit, (req, res) => {
   const { url, quality, mode, bitrate } = req.query;
 
   if (!url || !isYouTube(decodeURIComponent(url))) {
-    return res.status(400).json({ error: 'Invalid URL.' });
+    return res.status(400).json({ error: 'Invalid link.' });
   }
 
   const ytUrl  = decodeURIComponent(url);
@@ -181,7 +235,6 @@ app.get('/api/download', rateLimit, (req, res) => {
   const id     = uid();
   const outTpl = path.join(os.tmpdir(), `klip-${id}.%(ext)s`);
 
-  // Build format string
   let args;
   if (isAudio) {
     const aqMap = { '320': '0', '256': '2', '128': '5' };
@@ -222,10 +275,9 @@ app.get('/api/download', rateLimit, (req, res) => {
   const proc  = spawn('yt-dlp', args);
   let stderr = '';
 
-  proc.stderr.on('data', d => { stderr += d; process.stdout.write('.'); });
+  proc.stderr.on('data', d => { stderr += d; });
 
   proc.on('close', code => {
-    console.log('');
     if (code !== 0) {
       console.error(`[↓ FAIL] ${label}\n`, stderr.slice(-400));
       if (!res.headersSent) {
@@ -235,7 +287,10 @@ app.get('/api/download', rateLimit, (req, res) => {
     }
 
     const outFile = findFile(`klip-${id}`);
-    if (!outFile) return res.status(500).json({ error: 'Output file missing.' });
+    if (!outFile) {
+      console.error('[↓ FAIL] Output file missing for', label);
+      return res.status(500).json({ error: 'Something went wrong creating your file. Please try again.' });
+    }
 
     const stat   = fs.statSync(outFile);
     const ext    = path.extname(outFile).slice(1) || (isAudio ? 'mp3' : 'mp4');
@@ -255,14 +310,16 @@ app.get('/api/download', rateLimit, (req, res) => {
     req.on('close',    () => { stream.destroy(); cleanup(outFile); });
   });
 
-  proc.on('error', () => {
+  proc.on('error', (e) => {
+    console.error('[↓ SPAWN FAIL]', e.message);
     if (!res.headersSent) {
-      res.status(500).json({ error: 'yt-dlp not installed on server.' });
+      res.status(500).json({ error: 'Something went wrong. Please try again in a moment.' });
     }
   });
 });
 
 // ─── GET /api/health ───────────────────────────────────────
+// Diagnostic endpoint for YOU only — never linked from the public UI.
 app.get('/api/health', (req, res) => {
   const { execSync } = require('child_process');
   let ytdlp = 'not found', ffmpeg = 'not found';
@@ -287,6 +344,6 @@ app.listen(PORT, () => {
   ║   Port: ${PORT}                           ║
   ╚════════════════════════════════════════╝
   → http://localhost:${PORT}
-  → Health: http://localhost:${PORT}/api/health
+  → Health (private, for you): http://localhost:${PORT}/api/health
   `);
 });
