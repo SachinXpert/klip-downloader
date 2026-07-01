@@ -50,14 +50,22 @@ if (process.env.YT_COOKIES) {
    for datacenter IPs), with cookies if available.
 ────────────────────────────────────────────── */
 function antiBotArgs() {
-  const args = [
+  if (COOKIES_PATH) {
+    // Cookies are present — use the standard web client.
+    // It returns the full set of formats (1080p, 4K, etc.)
+    // and cookies handle any bot-check YouTube might raise.
+    return [
+      '--cookies', COOKIES_PATH,
+      '--extractor-args', 'youtube:player_client=web',
+    ];
+  }
+  // No cookies — spoof as iOS to bypass lighter bot checks.
+  // Fewer formats available but better than being blocked.
+  return [
     '--extractor-args', 'youtube:player_client=ios,mweb',
     '--user-agent',
     'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iPhone OS 17_5_1 like Mac OS X)',
-    '--add-header', 'Accept-Language:en-US,en;q=0.9',
   ];
-  if (COOKIES_PATH) args.push('--cookies', COOKIES_PATH);
-  return args;
 }
 
 /* ──────────────────────────────────────────────
