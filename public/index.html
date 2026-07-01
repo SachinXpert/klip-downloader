@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KLIP — Download Anything</title>
-<!-- Change "KLIP" to your brand name everywhere in this file -->
+<title>KLIP — Download YouTube Videos &amp; MP3, Free</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Outfit:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -12,238 +11,112 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 
-/* ═══ DESIGN TOKENS ════════════════════════ */
+/* ═══ TOKENS ════════════════════════════════ */
 :root{
-  /* backgrounds */
   --bg:    #0a0a08;
   --bg2:   #111110;
-  --bg3:   #1a1a17;
-  /* glass */
   --card:  rgba(255,255,255,0.028);
   --card-h:rgba(255,255,255,0.054);
-  /* borders */
   --b:     rgba(255,255,255,0.07);
   --b2:    rgba(255,255,255,0.13);
   --b-lime:rgba(163,230,53,0.25);
-  /* brand */
   --lime:  #a3e635;
   --lime2: #bef264;
   --lime-d:rgba(163,230,53,0.1);
   --lime-g:rgba(163,230,53,0.28);
-  /* text */
   --tx:    #f0efe8;
   --tx2:   #706f68;
   --tx3:   #35332e;
-  /* status */
   --green: #4ade80;
   --red:   #f87171;
   --amber: #fbbf24;
   --blue:  #60a5fa;
-  /* misc */
+  --violet:#a78bfa;
   --r:16px;
 }
 
-/* ═══ BASE ══════════════════════════════════ */
-body{
-  background:var(--bg);
-  color:var(--tx);
-  font-family:'Outfit',sans-serif;
-  min-height:100vh;
-  overflow-x:hidden;
-}
+body{background:var(--bg);color:var(--tx);font-family:'Outfit',sans-serif;min-height:100vh;overflow-x:hidden}
 ::selection{background:rgba(163,230,53,0.25);color:#fff}
 
-/* ═══ NOISE OVERLAY ════════════════════════ */
 body::before{
-  content:'';
-  position:fixed;inset:0;
-  z-index:0;pointer-events:none;
-  opacity:0.025;
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.025;
   background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size:200px;
 }
-
-/* ═══ CANVAS BG ═════════════════════════════ */
 #cv{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.6}
 
+/* ═══ EQUALIZER SIGNATURE MOTIF ═════════════ */
+.eq{display:inline-flex;align-items:flex-end;gap:2.5px;height:11px;flex-shrink:0}
+.eq span{width:2.5px;background:var(--lime);border-radius:1px;animation:eqbar .9s ease-in-out infinite;height:30%}
+.eq span:nth-child(1){animation-delay:0s}
+.eq span:nth-child(2){animation-delay:.15s}
+.eq span:nth-child(3){animation-delay:.3s}
+.eq span:nth-child(4){animation-delay:.45s}
+@keyframes eqbar{0%,100%{height:25%}50%{height:100%}}
+@media(prefers-reduced-motion:reduce){.eq span{animation:none;height:70%}}
+
 /* ═══ NAV ═══════════════════════════════════ */
-nav{
-  position:fixed;top:0;left:0;right:0;z-index:200;
-  height:60px;
-  background:rgba(10,10,8,0.85);
-  backdrop-filter:blur(20px);
-  -webkit-backdrop-filter:blur(20px);
-  border-bottom:1px solid var(--b);
-  display:flex;align-items:center;
-}
-.nav-w{
-  max-width:1160px;margin:0 auto;padding:0 28px;
-  width:100%;display:flex;align-items:center;justify-content:space-between;
-}
-.brand{
-  display:flex;align-items:center;gap:10px;
-  text-decoration:none;
-}
-.brand-logo{
-  font-family:'Syne',sans-serif;font-size:20px;font-weight:800;
-  letter-spacing:4px;color:var(--lime);
-  text-shadow:0 0 20px var(--lime-g);
-}
-.brand-tagline{
-  font-family:'Fira Code',monospace;font-size:10px;
-  color:var(--tx2);letter-spacing:1px;margin-top:1px;
-}
-.server-pill{
-  display:flex;align-items:center;gap:7px;
-  font-family:'Fira Code',monospace;font-size:11px;font-weight:500;
-  color:var(--tx2);letter-spacing:.5px;
-  background:var(--card);border:1px solid var(--b);
-  padding:5px 12px;border-radius:20px;cursor:pointer;
-  transition:all .25s;
-}
-.server-pill:hover{border-color:var(--b2);color:var(--tx)}
-.pill-dot{
-  width:6px;height:6px;border-radius:50%;
-  background:var(--green);
-  box-shadow:0 0 6px var(--green);
-  animation:pulse 2s ease infinite;
-}
-.pill-dot.off{background:var(--red);box-shadow:0 0 6px var(--red);animation:none}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;background:rgba(10,10,8,0.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--b);display:flex;align-items:center}
+.nav-w{max-width:1160px;margin:0 auto;padding:0 28px;width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;min-width:0}
+.brand-logo{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;letter-spacing:4px;color:var(--lime);text-shadow:0 0 20px var(--lime-g)}
+.brand-tagline{font-family:'Fira Code',monospace;font-size:10px;color:var(--tx2);letter-spacing:.5px;margin-top:1px;white-space:nowrap}
+.nav-badge{display:flex;align-items:center;gap:8px;font-family:'Fira Code',monospace;font-size:11px;font-weight:500;color:var(--tx2);background:var(--card);border:1px solid var(--b);padding:6px 14px;border-radius:20px;white-space:nowrap;flex-shrink:0}
 
 /* ═══ LAYOUT ════════════════════════════════ */
 .page{position:relative;z-index:1}
 .w{max-width:1160px;margin:0 auto;padding:0 28px}
 
 /* ═══ HERO ══════════════════════════════════ */
-.hero{
-  padding:120px 0 64px;
-  display:grid;
-  grid-template-columns:1fr;
-  gap:0;
-}
-.hero-kicker{
-  display:inline-flex;align-items:center;gap:8px;
-  font-family:'Fira Code',monospace;font-size:11px;font-weight:500;
-  color:var(--lime);letter-spacing:3px;text-transform:uppercase;
-  background:var(--lime-d);border:1px solid var(--b-lime);
-  padding:5px 16px;border-radius:40px;margin-bottom:32px;
-  width:fit-content;
-}
-.kicker-dot{
-  width:5px;height:5px;border-radius:50%;
-  background:var(--lime);box-shadow:0 0 7px var(--lime);
-  animation:pulse 1.6s infinite;
-}
-h1{
-  font-family:'Syne',sans-serif;
-  font-size:clamp(36px,6vw,80px);
-  font-weight:800;
-  line-height:1.0;
-  letter-spacing:-2px;
-  margin-bottom:20px;
-}
+.hero{padding:108px 0 56px}
+.hero-kicker{display:inline-flex;align-items:center;gap:10px;font-family:'Fira Code',monospace;font-size:11px;font-weight:500;color:var(--lime);letter-spacing:2.5px;text-transform:uppercase;background:var(--lime-d);border:1px solid var(--b-lime);padding:6px 16px 6px 14px;border-radius:40px;margin-bottom:30px;width:fit-content}
+h1{font-family:'Syne',sans-serif;font-size:clamp(34px,6vw,80px);font-weight:800;line-height:1.0;letter-spacing:-2px;margin-bottom:20px}
 h1 .t1{display:block;color:var(--tx)}
-h1 .t2{
-  display:block;
-  background:linear-gradient(120deg,var(--lime),var(--lime2),#fff);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-}
-.hero-p{
-  font-size:16px;font-weight:400;color:var(--tx2);
-  line-height:1.8;max-width:480px;margin-bottom:48px;
-}
+h1 .t2{display:block;background:linear-gradient(120deg,var(--lime),var(--lime2),#fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-p{font-size:16px;font-weight:400;color:var(--tx2);line-height:1.8;max-width:480px;margin-bottom:44px}
 
 /* ═══ INPUT ═════════════════════════════════ */
-.input-wrap{max-width:760px;position:relative;margin-bottom:28px}
-.glow{
-  position:absolute;inset:-1px;
-  border-radius:calc(var(--r)+2px);
-  background:linear-gradient(135deg,var(--lime),rgba(163,230,53,0.2));
-  opacity:0;transition:opacity .4s;z-index:0;
-  filter:blur(2px);
-}
+.input-wrap{max-width:760px;position:relative;margin-bottom:26px}
+.glow{position:absolute;inset:-1px;border-radius:calc(var(--r)+2px);background:linear-gradient(135deg,var(--lime),rgba(163,230,53,0.2));opacity:0;transition:opacity .4s;z-index:0;filter:blur(2px)}
 .input-wrap:focus-within .glow{opacity:.5}
-.input-box{
-  position:relative;z-index:1;
-  display:flex;align-items:center;gap:10px;
-  background:var(--bg2);
-  border:1px solid var(--b2);
-  border-radius:var(--r);
-  padding:8px 8px 8px 20px;
-  transition:border-color .3s;
-}
+.input-box{position:relative;z-index:1;display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--b2);border-radius:var(--r);padding:8px 8px 8px 20px;transition:border-color .3s}
 .input-wrap:focus-within .input-box{border-color:rgba(163,230,53,.4)}
-.yt-pill{
-  display:flex;align-items:center;gap:5px;
-  font-family:'Fira Code',monospace;font-size:10px;font-weight:500;
-  color:var(--red);background:rgba(248,113,113,.1);
-  border:1px solid rgba(248,113,113,.2);
-  padding:4px 10px;border-radius:20px;
-  white-space:nowrap;flex-shrink:0;
-}
-.url-field{
-  flex:1;min-width:0;
-  background:none;border:none;outline:none;
-  color:var(--tx);caret-color:var(--lime);
-  font-family:'Fira Code',monospace;font-size:13px;
-  padding:10px 0;
-}
+.yt-pill{display:flex;align-items:center;gap:5px;font-family:'Fira Code',monospace;font-size:10px;font-weight:500;color:var(--red);background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);padding:4px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+.url-field{flex:1;min-width:140px;background:none;border:none;outline:none;color:var(--tx);caret-color:var(--lime);font-family:'Fira Code',monospace;font-size:13px;padding:10px 0}
 .url-field::placeholder{color:var(--tx3)}
-.input-btns{display:flex;gap:6px;flex-shrink:0}
-.btn-s{
-  background:rgba(255,255,255,.05);
-  border:1px solid var(--b);
-  color:var(--tx2);
-  border-radius:10px;padding:9px 14px;
-  font-size:12px;font-weight:600;font-family:'Outfit',sans-serif;
-  cursor:pointer;transition:all .2s;white-space:nowrap;
-}
+.btn-group{display:flex;gap:6px;flex-shrink:0}
+.btn-s{background:rgba(255,255,255,.05);border:1px solid var(--b);color:var(--tx2);border-radius:10px;padding:9px 14px;font-size:12px;font-weight:600;font-family:'Outfit',sans-serif;cursor:pointer;transition:all .2s;white-space:nowrap}
 .btn-s:hover{background:rgba(255,255,255,.09);color:var(--tx);border-color:var(--b2)}
 .btn-s.del:hover{background:rgba(248,113,113,.1);color:var(--red);border-color:rgba(248,113,113,.3)}
-.btn-go{
-  display:flex;align-items:center;gap:8px;
-  background:var(--lime);color:#0a0a08;
-  border:none;border-radius:12px;
-  padding:12px 24px;
-  font-size:14px;font-weight:700;font-family:'Syne',sans-serif;
-  cursor:pointer;transition:all .25s;
-  letter-spacing:.5px;white-space:nowrap;
-  position:relative;overflow:hidden;
-}
-.btn-go::after{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(180deg,rgba(255,255,255,.15) 0%,transparent 60%);
-  pointer-events:none;
-}
+.btn-go{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--lime);color:#0a0a08;border:none;border-radius:12px;padding:12px 24px;font-size:14px;font-weight:700;font-family:'Syne',sans-serif;cursor:pointer;transition:all .25s;letter-spacing:.5px;white-space:nowrap;position:relative;overflow:hidden}
+.btn-go::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.15) 0%,transparent 60%);pointer-events:none}
 .btn-go:hover{background:var(--lime2);transform:translateY(-1px);box-shadow:0 6px 24px var(--lime-g)}
 .btn-go:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
 
-/* ═══ BADGES ════════════════════════════════ */
-.badges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:56px}
-.badge{
-  font-family:'Fira Code',monospace;
-  font-size:11px;font-weight:500;color:var(--tx2);
-  background:var(--card);border:1px solid var(--b);
-  padding:5px 12px;border-radius:8px;letter-spacing:.3px;
+@media(max-width:620px){
+  .input-box{padding:14px}
+  .btn-group{flex-basis:100%;width:100%;margin-top:2px}
+  .btn-group .btn-s{flex:1;padding:11px 6px}
+  .btn-group .btn-go{flex:1.4;padding:13px 8px}
 }
+
+/* ═══ BADGES ════════════════════════════════ */
+.badges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:52px}
+.badge{font-family:'Fira Code',monospace;font-size:11px;font-weight:500;color:var(--tx2);background:var(--card);border:1px solid var(--b);padding:5px 12px;border-radius:8px;letter-spacing:.3px}
 
 /* ═══ STATS ═════════════════════════════════ */
-.stats{
-  display:inline-flex;
-  background:var(--card);border:1px solid var(--b);
-  border-radius:14px;overflow:hidden;margin-bottom:0;
-}
+.stats{display:inline-flex;background:var(--card);border:1px solid var(--b);border-radius:14px;overflow:hidden}
 .stat{padding:16px 28px;border-right:1px solid var(--b);text-align:center}
 .stat:last-child{border-right:none}
-.stat-v{
-  font-family:'Syne',monospace;font-size:22px;font-weight:800;
-  color:var(--lime);line-height:1;margin-bottom:4px;
-}
+.stat-v{font-family:'Syne',monospace;font-size:22px;font-weight:800;color:var(--lime);line-height:1;margin-bottom:4px}
 .stat-l{font-size:12px;color:var(--tx2);font-weight:500}
+@media(max-width:680px){
+  .stats{display:grid;grid-template-columns:repeat(2,1fr);width:100%;max-width:380px;background:none;border:none;border-radius:0;gap:8px}
+  .stat{background:var(--card);border:1px solid var(--b);border-radius:12px;padding:14px 8px;border-right:1px solid var(--b)}
+}
 
 /* ═══ RESULTS ═══════════════════════════════ */
-.results{padding-top:72px;max-width:920px}
+.results{padding-top:64px;max-width:920px}
 .result-block{display:none;animation:up .42s cubic-bezier(.16,1,.3,1) both}
 .result-block.on{display:block}
 .b2-delay{animation-delay:.07s}
@@ -251,208 +124,108 @@ h1 .t2{
 @keyframes up{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
 
 .sec-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
-.sec-tag{
-  font-family:'Fira Code',monospace;font-size:10px;font-weight:500;
-  color:var(--tx2);letter-spacing:2.5px;text-transform:uppercase;white-space:nowrap;
-}
+.sec-tag{font-family:'Fira Code',monospace;font-size:10px;font-weight:500;color:var(--tx2);letter-spacing:2.5px;text-transform:uppercase;white-space:nowrap;display:flex;align-items:center;gap:8px}
 .sec-rule{flex:1;height:1px;background:var(--b)}
 
 /* ═══ VIDEO CARD ════════════════════════════ */
-.vcard{
-  background:var(--card);
-  border:1px solid var(--b2);
-  border-radius:20px;
-  padding:22px;
-  display:flex;gap:22px;
-  position:relative;overflow:hidden;
-}
-.vcard::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,var(--lime),rgba(163,230,53,0.2),transparent);
-}
-.thumb{
-  width:190px;min-width:190px;aspect-ratio:16/9;
-  border-radius:12px;overflow:hidden;
-  background:var(--bg2);position:relative;flex-shrink:0;
-}
+.vcard{background:var(--card);border:1px solid var(--b2);border-radius:20px;padding:22px;display:flex;gap:22px;position:relative;overflow:hidden}
+.vcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--lime),rgba(163,230,53,0.2),transparent)}
+.thumb{width:190px;min-width:190px;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:var(--bg2);position:relative;flex-shrink:0}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block}
-.play-ov{
-  position:absolute;inset:0;
-  display:flex;align-items:center;justify-content:center;
-  background:rgba(0,0,0,.2);
-}
-.play-circle{
-  width:42px;height:42px;border-radius:50%;
-  background:rgba(255,255,255,.93);
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 4px 14px rgba(0,0,0,.4);
-}
+.play-ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.2)}
+.play-circle{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.93);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.4)}
 .vmeta{flex:1;min-width:0}
-.v-src{
-  display:inline-flex;align-items:center;gap:6px;
-  font-size:11px;font-weight:600;color:var(--red);
-  background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);
-  padding:3px 10px;border-radius:20px;margin-bottom:10px;
-}
-.v-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;line-height:1.35;margin-bottom:8px}
+.v-src{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--red);background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);padding:3px 10px;border-radius:20px;margin-bottom:10px}
+.v-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;line-height:1.35;margin-bottom:8px;word-break:break-word}
 .v-ch{font-size:13px;color:var(--tx2);font-weight:500;margin-bottom:10px}
 .v-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
-.v-chip{
-  font-family:'Fira Code',monospace;font-size:11px;font-weight:500;
-  color:var(--lime);background:var(--lime-d);
-  border:1px solid rgba(163,230,53,.2);
-  padding:3px 10px;border-radius:8px;
-}
+.v-chip{font-family:'Fira Code',monospace;font-size:11px;font-weight:500;color:var(--lime);background:var(--lime-d);border:1px solid rgba(163,230,53,.2);padding:3px 10px;border-radius:8px}
 .v-tags{display:flex;flex-wrap:wrap;gap:6px}
-.v-tag{
-  font-size:11px;font-weight:500;color:var(--tx2);
-  background:var(--card);border:1px solid var(--b);
-  padding:3px 10px;border-radius:7px;
+.v-tag{font-size:11px;font-weight:500;color:var(--tx2);background:var(--card);border:1px solid var(--b);padding:3px 10px;border-radius:7px}
+
+@media(max-width:780px){
+  .vcard{flex-direction:column}
+  .thumb{width:100%;min-width:0}
+}
+@media(max-width:480px){
+  .vcard{padding:16px;border-radius:16px}
+  .v-title{font-size:15.5px}
 }
 
 /* ═══ QUALITY GRID ══════════════════════════ */
-.q-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(128px,1fr));
-  gap:10px;margin-bottom:18px;
-}
-.q{
-  background:var(--card);border:1px solid var(--b);
-  border-radius:14px;padding:15px 12px;
-  cursor:pointer;text-align:center;
-  transition:all .22s cubic-bezier(.16,1,.3,1);
-  user-select:none;position:relative;overflow:hidden;
-}
+.q-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:10px;margin-bottom:18px}
+.q{background:var(--card);border:1px solid var(--b);border-radius:14px;padding:15px 10px;cursor:pointer;text-align:center;transition:all .22s cubic-bezier(.16,1,.3,1);user-select:none;position:relative;overflow:hidden}
 .q:hover{background:var(--card-h);border-color:var(--b2);transform:translateY(-3px);box-shadow:0 8px 22px rgba(0,0,0,.3)}
 .q.v-sel{border-color:var(--lime);background:rgba(163,230,53,.09)}
 .q.a-sel{border-color:var(--blue);background:rgba(96,165,250,.08)}
-.q-ck{
-  position:absolute;top:7px;right:8px;
-  width:16px;height:16px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  font-size:9px;font-weight:700;opacity:0;transition:opacity .2s;
-}
+.q-ck{position:absolute;top:7px;right:8px;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;opacity:0;transition:opacity .2s}
 .q.v-sel .q-ck{opacity:1;background:var(--lime);color:#0a0a08}
 .q.a-sel .q-ck{opacity:1;background:var(--blue);color:#fff}
-.q-n{
-  font-family:'Syne',monospace;font-size:17px;font-weight:800;
-  color:var(--tx);margin-bottom:3px;transition:color .2s;
-}
+.q-n{font-family:'Syne',monospace;font-size:17px;font-weight:800;color:var(--tx);margin-bottom:3px;transition:color .2s}
 .q.v-sel .q-n{color:var(--lime)}
 .q.a-sel .q-n{color:var(--blue)}
-.q-fmt{font-size:10.5px;color:var(--tx2);font-weight:500;letter-spacing:.3px}
-.q-sz{font-size:9px;color:var(--tx3);margin-top:3px;font-family:'Fira Code',monospace}
-/* 4K special */
-.q.k4{border-color:rgba(251,191,36,.22);background:rgba(251,191,36,.04)}
-.q.k4 .q-n{color:var(--amber)}
-.q.k4:hover{border-color:rgba(251,191,36,.4)}
-.q.k4.v-sel{border-color:var(--amber);background:rgba(251,191,36,.1)}
-.q.k4.v-sel .q-ck{background:var(--amber);color:#000}
-.q-hdr{
-  display:inline-block;font-size:8px;font-weight:700;
-  color:#000;background:var(--amber);
-  padding:1px 5px;border-radius:4px;margin-top:2px;
-}
+.q-fmt{font-size:10px;color:var(--tx2);font-weight:500;letter-spacing:.2px;font-family:'Fira Code',monospace}
+/* Best-available tier (computed dynamically, never tied to a fixed resolution) */
+.q.best-tier{border-color:rgba(251,191,36,.22);background:rgba(251,191,36,.04)}
+.q.best-tier .q-n{color:var(--amber)}
+.q.best-tier:hover{border-color:rgba(251,191,36,.4)}
+.q.best-tier.v-sel{border-color:var(--amber);background:rgba(251,191,36,.1)}
+.q.best-tier.v-sel .q-ck{background:var(--amber);color:#000}
+.q-best{display:inline-block;font-size:8px;font-weight:700;color:#000;background:var(--amber);padding:1px 5px;border-radius:4px;margin-top:2px;letter-spacing:.3px}
+
+@media(max-width:680px){ .q-grid{grid-template-columns:repeat(3,1fr)} }
+@media(max-width:380px){ .q-grid{grid-template-columns:repeat(2,1fr);gap:8px} }
 
 /* ═══ DOWNLOAD BTN ══════════════════════════ */
-.dl-btn{
-  width:100%;padding:18px 32px;
-  border-radius:var(--r);border:none;cursor:pointer;
-  font-family:'Syne',sans-serif;font-size:16px;font-weight:800;
-  letter-spacing:.5px;
-  display:flex;align-items:center;justify-content:center;gap:10px;
-  transition:all .3s;position:relative;overflow:hidden;
-}
-.dl-btn.v-mode{
-  background:var(--lime);color:#0a0a08;
-  box-shadow:0 4px 28px rgba(163,230,53,.25);
-}
+.dl-btn{width:100%;padding:18px 32px;border-radius:var(--r);border:none;cursor:pointer;font-family:'Syne',sans-serif;font-size:16px;font-weight:800;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:10px;transition:all .3s;position:relative;overflow:hidden}
+.dl-btn.v-mode{background:var(--lime);color:#0a0a08;box-shadow:0 4px 28px rgba(163,230,53,.25)}
 .dl-btn.v-mode:hover{background:var(--lime2);transform:translateY(-2px);box-shadow:0 10px 36px rgba(163,230,53,.4)}
-.dl-btn.a-mode{
-  background:linear-gradient(135deg,var(--blue),#3b82f6);
-  color:#fff;box-shadow:0 4px 28px rgba(96,165,250,.25);
-}
+.dl-btn.a-mode{background:linear-gradient(135deg,var(--blue),#3b82f6);color:#fff;box-shadow:0 4px 28px rgba(96,165,250,.25)}
 .dl-btn.a-mode:hover{transform:translateY(-2px);box-shadow:0 10px 36px rgba(96,165,250,.4)}
-.dl-btn::before{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(180deg,rgba(255,255,255,.12) 0%,transparent 55%);
-  pointer-events:none;
-}
-.dl-btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+.dl-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.12) 0%,transparent 55%);pointer-events:none}
+.dl-btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important;box-shadow:none!important}
 
-/* Progress */
 .prog{margin-top:16px;display:none}
 .prog.on{display:block}
-.prog-bar{height:3px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden}
-.prog-fill{
-  height:100%;border-radius:4px;
-  background:linear-gradient(90deg,var(--lime),var(--lime2));
-  width:0%;transition:width .5s cubic-bezier(.4,0,.2,1);
-}
-.prog-fill.indeterminate{
-  width:40%!important;
-  animation:slide 1.4s ease-in-out infinite;
-}
-@keyframes slide{
-  0%{transform:translateX(-200%)}
-  100%{transform:translateX(350%)}
-}
-.prog-info{
-  margin-top:10px;
-  display:flex;justify-content:space-between;align-items:center;
-}
+.prog-bar{height:3px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden;position:relative}
+.prog-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--lime),var(--lime2));width:0%;transition:width .3s ease-out}
+.prog-fill.indeterminate{width:40%!important;animation:slide 1.4s ease-in-out infinite}
+@keyframes slide{0%{transform:translateX(-200%)}100%{transform:translateX(350%)}}
+.prog-info{margin-top:10px;display:flex;justify-content:space-between;align-items:center}
 .prog-msg{font-family:'Fira Code',monospace;font-size:11.5px;color:var(--tx2)}
 .prog-pct{font-family:'Fira Code',monospace;font-size:11.5px;color:var(--lime)}
 
 /* ═══ FEATURES ══════════════════════════════ */
-.features{
-  margin-top:100px;
-  padding-top:72px;border-top:1px solid var(--b);
-  padding-bottom:80px;
-}
-.feat-title{
-  font-family:'Syne',sans-serif;
-  font-size:clamp(24px,3.5vw,42px);font-weight:800;
-  letter-spacing:-1px;margin-bottom:12px;
-}
-.feat-sub{font-size:15px;color:var(--tx2);margin-bottom:52px;line-height:1.7}
+.features{margin-top:92px;padding-top:68px;border-top:1px solid var(--b);padding-bottom:76px}
+.feat-title{font-family:'Syne',sans-serif;font-size:clamp(24px,3.5vw,42px);font-weight:800;letter-spacing:-1px;margin-bottom:12px}
+.feat-sub{font-size:15px;color:var(--tx2);margin-bottom:48px;line-height:1.7;max-width:560px}
 .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.fc{
-  background:var(--card);border:1px solid var(--b);
-  border-radius:18px;padding:26px;
-  transition:all .3s;position:relative;overflow:hidden;
-}
-.fc::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--b2),transparent)}
+.fc{background:var(--card);border:1px solid var(--b);border-radius:18px;padding:24px;transition:all .3s}
 .fc:hover{background:var(--card-h);border-color:var(--b2);transform:translateY(-3px);box-shadow:0 12px 32px rgba(0,0,0,.3)}
-.fc-icon{
-  width:44px;height:44px;border-radius:12px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:20px;margin-bottom:16px;
-}
+.fc-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:16px}
 .fc-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:8px}
 .fc-desc{font-size:13px;color:var(--tx2);line-height:1.65}
 
+@media(max-width:780px){ .feat-grid{grid-template-columns:1fr 1fr} }
+@media(max-width:540px){ .feat-grid{grid-template-columns:1fr} }
+
+/* ═══ HOW IT WORKS ══════════════════════════ */
+.how{padding:0 0 84px}
+.how-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.step{padding:0}
+.step-n{font-family:'Syne',monospace;font-size:13px;font-weight:700;color:var(--amber);letter-spacing:1px;margin-bottom:10px;font-family:'Fira Code',monospace}
+.step-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:8px}
+.step-desc{font-size:13.5px;color:var(--tx2);line-height:1.7}
+@media(max-width:780px){ .how-grid{grid-template-columns:1fr;gap:24px} }
+
 /* ═══ FOOTER ════════════════════════════════ */
 footer{border-top:1px solid var(--b);padding:36px 0;text-align:center}
-.foot-brand{
-  font-family:'Syne',sans-serif;font-size:18px;font-weight:800;
-  letter-spacing:4px;color:var(--lime);
-  text-shadow:0 0 20px var(--lime-g);margin-bottom:10px;
-}
+.foot-brand{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;letter-spacing:4px;color:var(--lime);text-shadow:0 0 20px var(--lime-g);margin-bottom:10px}
 .foot-txt{font-size:13px;color:var(--tx3);line-height:1.7}
 
 /* ═══ TOAST ═════════════════════════════════ */
-.toasts{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
-.toast{
-  background:rgba(10,10,8,.96);
-  border:1px solid var(--b2);
-  border-radius:12px;padding:14px 18px;
-  font-size:13px;font-weight:500;
-  display:flex;align-items:center;gap:10px;
-  min-width:260px;max-width:340px;
-  animation:tin .3s cubic-bezier(.16,1,.3,1);
-  backdrop-filter:blur(20px);pointer-events:all;
-}
+.toasts{position:fixed;bottom:20px;right:16px;left:16px;z-index:999;display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
+.toast{background:rgba(10,10,8,.96);border:1px solid var(--b2);border-radius:12px;padding:14px 18px;font-size:13px;font-weight:500;display:flex;align-items:center;gap:10px;min-width:240px;max-width:340px;animation:tin .3s cubic-bezier(.16,1,.3,1);backdrop-filter:blur(20px);pointer-events:all}
 .toast.ok {border-color:rgba(74,222,128,.3)}
 .toast.err{border-color:rgba(248,113,113,.3)}
 .toast.inf{border-color:rgba(163,230,53,.3)}
@@ -462,27 +235,28 @@ footer{border-top:1px solid var(--b);padding:36px 0;text-align:center}
 .toast.err .t-ic{background:rgba(248,113,113,.15);color:var(--red)}
 .toast.inf .t-ic{background:rgba(163,230,53,.12);color:var(--lime)}
 .toast.wrn .t-ic{background:rgba(251,191,36,.15);color:var(--amber)}
-@keyframes tin{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:translateX(0)}}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
 /* ═══ SPINNER ═══════════════════════════════ */
-.spin{width:17px;height:17px;flex-shrink:0;border-radius:50%;border:2.5px solid rgba(0,0,0,.2);border-top-color:#0a0a08;animation:rot .7s linear infinite}
-.spin.lt{border-color:rgba(255,255,255,.2);border-top-color:#fff}
+.spin{width:16px;height:16px;flex-shrink:0;border-radius:50%;border:2.5px solid rgba(0,0,0,.2);border-top-color:#0a0a08;animation:rot .7s linear infinite}
+.spin.lt{border-color:rgba(255,255,255,.25);border-top-color:#fff}
 @keyframes rot{to{transform:rotate(360deg)}}
 
-/* ═══ RESPONSIVE ════════════════════════════ */
-@media(max-width:800px){
-  .feat-grid{grid-template-columns:1fr 1fr}
-  .vcard{flex-direction:column}
-  .thumb{width:100%;min-width:0}
-  .stats{flex-wrap:wrap}
-  .stat{padding:14px 20px}
-  .q-grid{grid-template-columns:repeat(3,1fr)}
-}
+/* ═══ FOCUS STATES (a11y) ═══════════════════ */
+button:focus-visible,input:focus-visible,.q:focus-visible{outline:2px solid var(--lime);outline-offset:2px}
+
+/* ═══ RESPONSIVE — GLOBAL TUNING ════════════ */
 @media(max-width:540px){
-  .feat-grid{grid-template-columns:1fr}
-  h1{font-size:34px}
-  .input-btns .btn-s:not(:last-of-type){display:none}
-  .q-grid{grid-template-columns:repeat(3,1fr)}
+  .w{padding:0 18px}
+  .hero{padding:96px 0 44px}
+  h1{font-size:32px;letter-spacing:-1px}
+  .hero-p{font-size:14.5px}
+}
+@media(max-width:420px){
+  .brand-tagline{display:none}
+  .nav-badge span{display:none}
+  .yt-pill span{display:none}
+  .url-field{font-size:12.5px;min-width:90px}
 }
 </style>
 </head>
@@ -490,18 +264,17 @@ footer{border-top:1px solid var(--b);padding:36px 0;text-align:center}
 
 <canvas id="cv"></canvas>
 
-<!-- NAV -->
 <nav>
   <div class="nav-w">
     <a class="brand" href="#">
       <div>
         <div class="brand-logo">KLIP</div>
-        <div class="brand-tagline">own engine · zero limits</div>
+        <div class="brand-tagline">youtube downloads, instantly</div>
       </div>
     </a>
-    <div class="server-pill" onclick="checkHealth()" id="pill">
-      <div class="pill-dot" id="pilldot"></div>
-      <span id="pilltext">Checking…</span>
+    <div class="nav-badge">
+      <div class="eq" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      <span>Free &amp; Unlimited</span>
     </div>
   </div>
 </nav>
@@ -511,58 +284,58 @@ footer{border-top:1px solid var(--b);padding:36px 0;text-align:center}
 
 <!-- HERO -->
 <section class="hero">
-  <div>
-    <div class="hero-kicker"><div class="kicker-dot"></div>100% Self-Hosted · yt-dlp Engine</div>
-    <h1>
-      <span class="t1">DOWNLOAD</span>
-      <span class="t2">ANYTHING.</span>
-    </h1>
-    <p class="hero-p">Paste a YouTube link and download in 4K, 1080p, 720p or extract crystal-clear MP3 — powered entirely by your own server. No third parties. No limits.</p>
+  <div class="hero-kicker">
+    <div class="eq" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+    Free Forever · No Signup Needed
+  </div>
+  <h1>
+    <span class="t1">DOWNLOAD</span>
+    <span class="t2">ANYTHING.</span>
+  </h1>
+  <p class="hero-p">Paste any YouTube link and download it in seconds — original-quality video or crystal-clear MP3 audio. No ads, no popups, no catch.</p>
 
-    <!-- URL INPUT -->
-    <div class="input-wrap">
-      <div class="glow"></div>
-      <div class="input-box">
-        <div class="yt-pill">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M21.8 8a2.75 2.75 0 0 0-1.94-1.95C18.2 5.6 12 5.6 12 5.6s-6.2 0-7.86.45A2.75 2.75 0 0 0 2.2 8a28.8 28.8 0 0 0-.45 4 28.8 28.8 0 0 0 .45 4 2.75 2.75 0 0 0 1.94 1.95C5.8 18.4 12 18.4 12 18.4s6.2 0 7.86-.45A2.75 2.75 0 0 0 21.8 16a28.8 28.8 0 0 0 .45-4 28.8 28.8 0 0 0-.45-4zM9.75 15.2V8.8l5.25 3.2z"/></svg>
-          YouTube
-        </div>
-        <input id="urlIn" class="url-field" type="url"
-          placeholder="youtube.com/watch?v=… or youtu.be/…"
-          autocomplete="off" spellcheck="false">
-        <div class="input-btns">
-          <button class="btn-s" onclick="doPaste()">Paste</button>
-          <button class="btn-s del" onclick="clearAll()">✕</button>
-        </div>
+  <div class="input-wrap">
+    <div class="glow"></div>
+    <div class="input-box">
+      <div class="yt-pill">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.8 8a2.75 2.75 0 0 0-1.94-1.95C18.2 5.6 12 5.6 12 5.6s-6.2 0-7.86.45A2.75 2.75 0 0 0 2.2 8a28.8 28.8 0 0 0-.45 4 28.8 28.8 0 0 0 .45 4 2.75 2.75 0 0 0 1.94 1.95C5.8 18.4 12 18.4 12 18.4s6.2 0 7.86-.45A2.75 2.75 0 0 0 21.8 16a28.8 28.8 0 0 0 .45-4 28.8 28.8 0 0 0-.45-4zM9.75 15.2V8.8l5.25 3.2z"/></svg>
+        <span>YouTube</span>
+      </div>
+      <input id="urlIn" class="url-field" type="url" inputmode="url"
+        placeholder="youtube.com/watch?v=… or youtu.be/…"
+        aria-label="YouTube video link"
+        autocomplete="off" spellcheck="false">
+      <div class="btn-group">
+        <button class="btn-s" onclick="doPaste()">Paste</button>
+        <button class="btn-s del" onclick="clearAll()">Clear</button>
         <button class="btn-go" id="goBtn" onclick="analyze()">
-          <span id="goTxt">Grab It →</span>
+          <span id="goTxt">Grab it →</span>
         </button>
       </div>
     </div>
+  </div>
 
-    <div class="badges">
-      <span class="badge">▶ YouTube</span>
-      <span class="badge">📱 Shorts</span>
-      <span class="badge">🎵 YT Music</span>
-      <span class="badge">🔴 Live Streams</span>
-    </div>
+  <div class="badges">
+    <span class="badge">▶ YouTube</span>
+    <span class="badge">📱 Shorts</span>
+    <span class="badge">🎵 YT Music</span>
+    <span class="badge">🔴 Live Streams</span>
+  </div>
 
-    <div class="stats">
-      <div class="stat"><div class="stat-v">4K</div><div class="stat-l">Max Resolution</div></div>
-      <div class="stat"><div class="stat-v">320k</div><div class="stat-l">MP3 Quality</div></div>
-      <div class="stat"><div class="stat-v">8+</div><div class="stat-l">Formats</div></div>
-      <div class="stat"><div class="stat-v">0</div><div class="stat-l">Third Parties</div></div>
-    </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-v">4K</div><div class="stat-l">Max Resolution</div></div>
+    <div class="stat"><div class="stat-v">320k</div><div class="stat-l">MP3 Bitrate</div></div>
+    <div class="stat"><div class="stat-v">0</div><div class="stat-l">Ads &amp; Popups</div></div>
+    <div class="stat"><div class="stat-v">Free</div><div class="stat-l">Forever</div></div>
   </div>
 </section>
 
 <!-- RESULTS -->
 <div class="results">
 
-  <!-- VIDEO INFO -->
   <div class="result-block" id="rb1">
     <div class="sec-head">
-      <span class="sec-tag">Video Detected</span>
+      <span class="sec-tag">Video Found</span>
       <div class="sec-rule"></div>
     </div>
     <div class="vcard">
@@ -570,13 +343,13 @@ footer{border-top:1px solid var(--b);padding:36px 0;text-align:center}
         <img id="vimg" src="" alt="">
         <div class="play-ov">
           <div class="play-circle">
-            <svg width="14" height="16" viewBox="0 0 14 16" fill="#222"><path d="M0 0l14 8-14 8z"/></svg>
+            <svg width="14" height="16" viewBox="0 0 14 16" fill="#222" aria-hidden="true"><path d="M0 0l14 8-14 8z"/></svg>
           </div>
         </div>
       </div>
       <div class="vmeta">
         <div class="v-src">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M21.8 8a2.75 2.75 0 0 0-1.94-1.95C18.2 5.6 12 5.6 12 5.6s-6.2 0-7.86.45A2.75 2.75 0 0 0 2.2 8a28.8 28.8 0 0 0-.45 4 28.8 28.8 0 0 0 .45 4 2.75 2.75 0 0 0 1.94 1.95C5.8 18.4 12 18.4 12 18.4s6.2 0 7.86-.45A2.75 2.75 0 0 0 21.8 16a28.8 28.8 0 0 0 .45-4 28.8 28.8 0 0 0-.45-4zM9.75 15.2V8.8l5.25 3.2z"/></svg>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.8 8a2.75 2.75 0 0 0-1.94-1.95C18.2 5.6 12 5.6 12 5.6s-6.2 0-7.86.45A2.75 2.75 0 0 0 2.2 8a28.8 28.8 0 0 0-.45 4 28.8 28.8 0 0 0 .45 4 2.75 2.75 0 0 0 1.94 1.95C5.8 18.4 12 18.4 12 18.4s6.2 0 7.86-.45A2.75 2.75 0 0 0 21.8 16a28.8 28.8 0 0 0 .45-4 28.8 28.8 0 0 0-.45-4zM9.75 15.2V8.8l5.25 3.2z"/></svg>
           YouTube
         </div>
         <div class="v-title" id="vtitle">—</div>
@@ -587,7 +360,6 @@ footer{border-top:1px solid var(--b);padding:36px 0;text-align:center}
     </div>
   </div>
 
-  <!-- QUALITY PICKER -->
   <div class="result-block b2-delay" id="rb2">
     <div class="sec-head" style="margin-top:24px">
       <span class="sec-tag">Video Quality</span>
@@ -596,22 +368,21 @@ footer{border-top:1px solid var(--b);padding:36px 0;text-align:center}
     <div class="q-grid" id="vGrid"></div>
 
     <div class="sec-head" style="margin-top:20px">
-      <span class="sec-tag">Audio Only — MP3</span>
+      <span class="sec-tag"><div class="eq" aria-hidden="true"><span></span><span></span><span></span><span></span></div>Audio Only — MP3</span>
       <div class="sec-rule"></div>
     </div>
     <div class="q-grid" id="aGrid"></div>
   </div>
 
-  <!-- DOWNLOAD BUTTON -->
   <div class="result-block b3-delay" id="rb3">
     <button class="dl-btn v-mode" id="dlBtn" onclick="startDL()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-      <span id="dlTxt">Download 1080p MP4</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+      <span id="dlTxt">Download</span>
     </button>
     <div class="prog" id="prog">
       <div class="prog-bar"><div class="prog-fill" id="pfill"></div></div>
       <div class="prog-info">
-        <span class="prog-msg" id="pmsg">Sending to server…</span>
+        <span class="prog-msg" id="pmsg">Connecting…</span>
         <span class="prog-pct" id="ppct"></span>
       </div>
     </div>
@@ -620,38 +391,61 @@ footer{border-top:1px solid var(--b);padding:36px 0;text-align:center}
 
 <!-- FEATURES -->
 <section class="features">
-  <div class="feat-title">Why KLIP?</div>
-  <div class="feat-sub">Everything runs on your server. No middlemen. No compromise.</div>
+  <div class="feat-title">Why people choose KLIP</div>
+  <div class="feat-sub">Built for people who just want their file — fast, clean, and exactly the quality they asked for.</div>
   <div class="feat-grid">
     <div class="fc">
-      <div class="fc-icon" style="background:rgba(163,230,53,.12);color:var(--lime)">🔧</div>
-      <div class="fc-title">100% Self-Hosted</div>
-      <div class="fc-desc">yt-dlp runs directly on your server. Zero external APIs. Zero third-party services. Pure control.</div>
+      <div class="fc-icon" style="background:rgba(163,230,53,.12);color:var(--lime)">⚡</div>
+      <div class="fc-title">Instant Downloads</div>
+      <div class="fc-desc">Pick your quality and your file starts immediately — no countdown timers, no "click 5 times to continue."</div>
     </div>
     <div class="fc">
-      <div class="fc-icon" style="background:rgba(251,191,36,.12);color:var(--amber)">🎬</div>
-      <div class="fc-title">Up to 4K HDR</div>
-      <div class="fc-desc">2160p, 1440p, 1080p, 720p, 480p, 360p — yt-dlp fetches the original stream, ffmpeg merges perfectly.</div>
+      <div class="fc-icon" style="background:rgba(251,191,36,.12);color:var(--amber)">🎯</div>
+      <div class="fc-title">Real, Honest Quality</div>
+      <div class="fc-desc">We only show resolutions that actually exist for that video — never an option that quietly fails.</div>
     </div>
     <div class="fc">
       <div class="fc-icon" style="background:rgba(96,165,250,.12);color:var(--blue)">🎵</div>
-      <div class="fc-title">Crystal MP3</div>
-      <div class="fc-desc">320kbps, 256kbps, 128kbps — extract clean audio from any video. Perfect for music offline.</div>
+      <div class="fc-title">Studio-Clean MP3</div>
+      <div class="fc-desc">Extract audio at 320, 256 or 128kbps — perfect for music, podcasts or lectures, on the go.</div>
     </div>
     <div class="fc">
-      <div class="fc-icon" style="background:rgba(74,222,128,.12);color:var(--green)">⚡</div>
-      <div class="fc-title">Direct Streaming</div>
-      <div class="fc-desc">Your server processes and streams the file straight to your browser. Click → Download starts.</div>
+      <div class="fc-icon" style="background:rgba(248,113,113,.12);color:var(--red)">🚫</div>
+      <div class="fc-title">Zero Ads, Zero Popups</div>
+      <div class="fc-desc">No redirect chains, no pop-unders, no ten fake buttons to dodge before your real download.</div>
     </div>
     <div class="fc">
-      <div class="fc-icon" style="background:rgba(248,113,113,.12);color:var(--red)">🛡️</div>
-      <div class="fc-title">Zero Data Policy</div>
-      <div class="fc-desc">No logs. No tracking. Temp files deleted after download. Your privacy stays yours.</div>
+      <div class="fc-icon" style="background:rgba(163,230,53,.12);color:var(--lime)">🔒</div>
+      <div class="fc-title">Your Privacy, Respected</div>
+      <div class="fc-desc">We don't track what you download or keep your files once they've been delivered to you.</div>
     </div>
     <div class="fc">
-      <div class="fc-icon" style="background:rgba(167,139,250,.12);color:#a78bfa">📱</div>
-      <div class="fc-title">Works Everywhere</div>
-      <div class="fc-desc">Phone, tablet, desktop — any browser. Your KLIP, your rules, every device.</div>
+      <div class="fc-icon" style="background:rgba(167,139,250,.12);color:var(--violet)">📱</div>
+      <div class="fc-title">Works On Any Device</div>
+      <div class="fc-desc">Phone, tablet or desktop — KLIP feels right at home in any browser, no installs needed.</div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how">
+  <div class="feat-title" style="margin-bottom:10px">How it works</div>
+  <div class="feat-sub" style="margin-bottom:40px">Three steps. Ten seconds. Done.</div>
+  <div class="how-grid">
+    <div class="step">
+      <div class="step-n">01</div>
+      <div class="step-title">Paste your link</div>
+      <div class="step-desc">Copy any YouTube URL — a video, a Short, or a Music track — and drop it in the box above.</div>
+    </div>
+    <div class="step">
+      <div class="step-n">02</div>
+      <div class="step-title">Choose quality</div>
+      <div class="step-desc">Pick the exact resolution you want, or switch to clean MP3 audio instead.</div>
+    </div>
+    <div class="step">
+      <div class="step-n">03</div>
+      <div class="step-title">Download instantly</div>
+      <div class="step-desc">Hit download and your file starts right away — no detours, no delays.</div>
     </div>
   </div>
 </section>
@@ -659,11 +453,10 @@ footer{border-top:1px solid var(--b);padding:36px 0;text-align:center}
 </div><!-- /w -->
 </div><!-- /page -->
 
-<!-- FOOTER -->
 <footer>
   <div class="w">
     <div class="foot-brand">KLIP</div>
-    <div class="foot-txt">Your server. Your engine. Your downloads.<br>For personal use only — respect content creators.</div>
+    <div class="foot-txt">Fast, free downloads — built to respect your time.<br>For personal use only — please respect creators and copyright.</div>
   </div>
 </footer>
 
@@ -671,7 +464,7 @@ footer{border-top:1px solid var(--b);padding:36px 0;text-align:center}
 
 <script>
 /* ════════════════════════════════════════════
-   CANVAS BACKGROUND (animated orbs)
+   CANVAS BACKGROUND (ambient orbs)
 ════════════════════════════════════════════ */
 const cv=document.getElementById('cv');
 const cx=cv.getContext('2d');
@@ -701,64 +494,66 @@ let t=0;
 })();
 
 /* ════════════════════════════════════════════
-   SERVER HEALTH CHECK (own server only)
-════════════════════════════════════════════ */
-async function checkHealth(){
-  const dot=document.getElementById('pilldot');
-  const txt=document.getElementById('pilltext');
-  try{
-    const r=await fetch('/api/health',{signal:AbortSignal.timeout(4000)});
-    const d=await r.json();
-    dot.className='pill-dot';
-    txt.textContent=`Online · yt-dlp ${d.ytdlp}`;
-    toast('Server online ✓','ok');
-  } catch{
-    dot.className='pill-dot off';
-    txt.textContent='Server Offline';
-    toast('Server not reachable — is it running?','err');
-  }
-}
-checkHealth();
-
-/* ════════════════════════════════════════════
    STATE
 ════════════════════════════════════════════ */
-let S={url:'',info:null,mode:'video',vq:'1080',aq:'320'};
+let S={url:'',info:null,mode:'video',vq:'1080',aq:'320',avail:null,audioSizes:null};
 
 /* ════════════════════════════════════════════
-   QUALITY DATA
+   QUALITY LABELS (friendly names for known tiers —
+   actual availability always comes from the server)
 ════════════════════════════════════════════ */
 const VQ=[
-  {l:'4K',   v:'2160',f:'MP4 HDR',s:'~2.5 GB/hr',k4:true,hdr:true},
-  {l:'1440p',v:'1440',f:'MP4',    s:'~1.2 GB/hr'},
-  {l:'1080p',v:'1080',f:'MP4',    s:'~600 MB/hr'},
-  {l:'720p', v:'720', f:'MP4',    s:'~320 MB/hr'},
-  {l:'480p', v:'480', f:'MP4',    s:'~180 MB/hr'},
-  {l:'360p', v:'360', f:'MP4',    s:'~90 MB/hr'},
+  {l:'4K',   v:'2160'},
+  {l:'1440p',v:'1440'},
+  {l:'1080p',v:'1080'},
+  {l:'720p', v:'720'},
+  {l:'480p', v:'480'},
+  {l:'360p', v:'360'},
 ];
 const AQ=[
-  {l:'320k',v:'320',f:'MP3 HQ',s:'~145 MB/hr'},
-  {l:'256k',v:'256',f:'MP3',   s:'~115 MB/hr'},
-  {l:'128k',v:'128',f:'MP3',   s:'~58 MB/hr'},
+  {l:'320k',v:'320'},
+  {l:'256k',v:'256'},
+  {l:'128k',v:'128'},
 ];
 
+function fmtBytes(b){
+  if(!b) return '';
+  if(b>=1e9) return (b/1e9).toFixed(1)+' GB';
+  if(b>=1e6) return Math.round(b/1e6)+' MB';
+  if(b>=1e3) return Math.round(b/1e3)+' KB';
+  return '';
+}
+
+/* ════════════════════════════════════════════
+   RENDER QUALITY GRIDS — always driven by REAL
+   per-video data, so an unavailable resolution
+   (e.g. 4K on a 1080p upload) is never shown.
+════════════════════════════════════════════ */
 function renderGrids(){
-  document.getElementById('vGrid').innerHTML=VQ.map(q=>`
-    <div class="q ${q.k4?'k4':''} ${S.mode==='video'&&S.vq===q.v?'v-sel':''}" onclick="pick('${q.v}','v')">
+  const avail = (S.avail && S.avail.length) ? S.avail : VQ.map(q=>({height:parseInt(q.v),bytes:0}));
+
+  const vList = avail.map(a=>{
+    const known = VQ.find(q=>parseInt(q.v)===a.height);
+    return { v:String(a.height), l:known?known.l:(a.height+'p'), bytes:a.bytes };
+  });
+
+  document.getElementById('vGrid').innerHTML = vList.map((q,i)=>`
+    <div class="q ${i===0?'best-tier':''} ${S.mode==='video'&&S.vq===q.v?'v-sel':''}" onclick="pick('${q.v}','v')" tabindex="0">
       <div class="q-ck">✓</div>
       <div class="q-n">${q.l}</div>
-      ${q.hdr?`<div class="q-hdr">HDR</div>`:''}
-      <div class="q-fmt">${q.f}</div>
-      <div class="q-sz">${q.s}</div>
+      ${i===0?'<div class="q-best">Best</div>':''}
+      <div class="q-fmt">MP4${q.bytes?' · '+fmtBytes(q.bytes):''}</div>
     </div>`).join('');
 
-  document.getElementById('aGrid').innerHTML=AQ.map(q=>`
-    <div class="q ${S.mode==='audio'&&S.aq===q.v?'a-sel':''}" onclick="pick('${q.v}','a')">
+  document.getElementById('aGrid').innerHTML = AQ.map(q=>{
+    const bytes = S.audioSizes ? S.audioSizes[q.v] : 0;
+    return `
+    <div class="q ${S.mode==='audio'&&S.aq===q.v?'a-sel':''}" onclick="pick('${q.v}','a')" tabindex="0">
       <div class="q-ck">✓</div>
       <div class="q-n">${q.l}</div>
-      <div class="q-fmt">${q.f}</div>
-      <div class="q-sz">${q.s}</div>
-    </div>`).join('');
+      <div class="q-fmt">MP3${bytes?' · '+fmtBytes(bytes):''}</div>
+    </div>`;
+  }).join('');
 
   const btn=document.getElementById('dlBtn'),t=document.getElementById('dlTxt');
   if(S.mode==='audio'){
@@ -766,8 +561,8 @@ function renderGrids(){
     t.textContent=`Download MP3 ${S.aq}kbps`;
   } else {
     btn.className='dl-btn v-mode';
-    const q=VQ.find(x=>x.v===S.vq);
-    t.textContent=`Download ${q?q.l:S.vq} MP4`;
+    const match=vList.find(x=>x.v===S.vq);
+    t.textContent=`Download ${match?match.l:S.vq+'p'} MP4`;
   }
 }
 
@@ -785,20 +580,20 @@ async function doPaste(){
     const t=await navigator.clipboard.readText();
     document.getElementById('urlIn').value=t;
     toast('Pasted ✓','ok');
-  } catch{ toast('Paste with Ctrl+V','wrn'); }
+  } catch{ toast('Paste with Ctrl+V (or long-press → Paste)','wrn'); }
 }
 function clearAll(){
   document.getElementById('urlIn').value='';
   ['rb1','rb2','rb3'].forEach(id=>document.getElementById(id).classList.remove('on'));
-  S.url='';S.info=null;
+  S.url='';S.info=null;S.avail=null;S.audioSizes=null;
 }
 
 /* ════════════════════════════════════════════
-   ANALYZE — calls OWN backend only
+   ANALYZE
 ════════════════════════════════════════════ */
 async function analyze(){
   const raw=document.getElementById('urlIn').value.trim();
-  if(!raw){toast('Enter a YouTube URL first','err');return;}
+  if(!raw){toast('Please paste a YouTube link first','err');return;}
 
   const isYT=raw.includes('youtube.com')||raw.includes('youtu.be');
   if(!isYT){toast('Only YouTube links are supported','err');return;}
@@ -810,40 +605,48 @@ async function analyze(){
   goTxt.innerHTML='<div class="spin"></div>';
 
   try{
-    // ── ONLY our own backend ──────────────────────
     const res=await fetch('/api/info',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({url:raw})
     });
     const data=await res.json();
-    if(!res.ok) throw new Error(data.error||`Server error ${res.status}`);
+    if(!res.ok) throw new Error(data.error||"Couldn't process that link — please try again.");
 
     S.info=data;
+    S.avail=data.qualities||[];
+    S.audioSizes=data.audioSizes||{};
+    S.mode='video';
+    S.vq=String((S.avail[0]&&S.avail[0].height)||1080);
+
     fillInfo(data);
     show();
-    toast('Video found! Select quality.','inf');
+    toast('Video found — pick a quality below','inf');
 
   } catch(err){
-    toast(err.message||'Server error — is the server running?','err');
-    // NO fallback to any external service
+    toast(err.message||"Couldn't process that link — please try again.",'err');
   } finally{
     btn.disabled=false;
-    goTxt.textContent='Grab It →';
+    goTxt.textContent='Grab it →';
   }
 }
 
-function fillInfo({id,title,author,thumbnail,duration,views}){
+function fillInfo({id,title,author,thumbnail,duration,views,isShort,qualities}){
   const img=document.getElementById('vimg');
   img.src=thumbnail||`https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
   img.onerror=()=>{ img.src=`https://i.ytimg.com/vi/${id}/hqdefault.jpg`; };
   document.getElementById('vtitle').textContent=title;
   document.getElementById('vchan').textContent='📺 '+author;
+
   const chips=[];
   if(duration) chips.push(`⏱ ${duration}`);
   if(views)    chips.push(`👁 ${views}`);
+  if(isShort)  chips.push('📱 Short');
   document.getElementById('vmrow').innerHTML=chips.map(c=>`<span class="v-chip">${c}</span>`).join('');
-  document.getElementById('vtags').innerHTML=['MP4','MP3','4K','No Watermark'].map(t=>`<span class="v-tag">${t}</span>`).join('');
+
+  const top = (qualities && qualities[0]) ? qualities[0].height+'p' : 'HD';
+  const tags=[`Up to ${top}`,'MP3 available','No watermark'];
+  document.getElementById('vtags').innerHTML=tags.map(t=>`<span class="v-tag">${t}</span>`).join('');
 }
 
 function show(){
@@ -853,10 +656,10 @@ function show(){
 }
 
 /* ════════════════════════════════════════════
-   DOWNLOAD — calls OWN backend only
+   DOWNLOAD — real progress via streamed fetch
 ════════════════════════════════════════════ */
-function startDL(){
-  if(!S.url){toast('Analyze a video first','err');return;}
+async function startDL(){
+  if(!S.url){toast('Please analyze a video first','err');return;}
 
   const btn=document.getElementById('dlBtn');
   const dlTxt=document.getElementById('dlTxt');
@@ -867,64 +670,77 @@ function startDL(){
 
   const isAudio=S.mode==='audio';
   btn.disabled=true;
-  dlTxt.innerHTML=`<div class="spin${isAudio?'':' lt'}"></div> Processing…`;
+  dlTxt.innerHTML=`<div class="spin${isAudio?' lt':''}"></div> Preparing…`;
   prog.classList.add('on');
-  pfill.className='prog-fill indeterminate';
-  pmsg.textContent='Server downloading with yt-dlp…';
+  pfill.classList.remove('indeterminate');
+  pfill.style.width='0%';
+  pmsg.textContent='Connecting…';
   ppct.textContent='';
 
-  // Build download URL — OWN server only
-  const params=new URLSearchParams({
-    url:     S.url,
-    quality: S.vq,
-    mode:    S.mode,
-    bitrate: S.aq
-  });
+  const params=new URLSearchParams({url:S.url,quality:S.vq,mode:S.mode,bitrate:S.aq});
   const dlUrl=`/api/download?${params}`;
 
-  // Trigger download — browser opens the URL,
-  // server streams the file back directly
-  const a=document.createElement('a');
-  a.href=dlUrl;
-  a.download='';
-  a.style.display='none';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  try{
+    const res=await fetch(dlUrl);
+    if(!res.ok){
+      let msg="Couldn't complete this download — please try again.";
+      try{ const j=await res.json(); if(j.error) msg=j.error; }catch{}
+      throw new Error(msg);
+    }
 
-  // Show message while server processes
-  // (yt-dlp + ffmpeg runs on server, takes 10-60s)
-  const msgs=[
-    'yt-dlp fetching stream…',
-    'Downloading video chunks…',
-    'ffmpeg merging video + audio…',
-    'Encoding…',
-    'Almost done…',
-    'Preparing file to send…'
-  ];
-  let i=0;
-  const msgTimer=setInterval(()=>{
-    pmsg.textContent=msgs[i%msgs.length]; i++;
-  },3500);
+    const total=parseInt(res.headers.get('Content-Length')||'0',10);
+    const reader=res.body.getReader();
+    const chunks=[];
+    let received=0;
 
-  toast('Download processing on server — may take 30-60 sec for large files.','inf');
+    dlTxt.innerHTML=`<div class="spin${isAudio?' lt':''}"></div> Downloading…`;
+    pmsg.textContent='Downloading…';
+    if(!total) pfill.classList.add('indeterminate');
 
-  // Reset UI after reasonable wait
-  setTimeout(()=>{
-    clearInterval(msgTimer);
-    pfill.className='prog-fill';
+    while(true){
+      const {done,value}=await reader.read();
+      if(done) break;
+      chunks.push(value);
+      received+=value.length;
+      if(total){
+        const pct=Math.min(99,Math.round((received/total)*100));
+        pfill.style.width=pct+'%';
+        ppct.textContent=pct+'%';
+      }
+    }
+
+    const blob=new Blob(chunks);
+    const cd=res.headers.get('Content-Disposition')||'';
+    const m=cd.match(/filename="([^"]+)"/);
+    const filename=m?m[1]:(isAudio?'klip-audio.mp3':'klip-video.mp4');
+
+    const blobUrl=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=blobUrl; a.download=filename; a.style.display='none';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(blobUrl),4000);
+
+    pfill.classList.remove('indeterminate');
     pfill.style.width='100%';
-    pmsg.textContent='✓ Download should be in your browser!';
-    ppct.textContent='Done';
-    toast('Check your downloads folder 🚀','ok');
+    ppct.textContent='100%';
+    pmsg.textContent='Done!';
+    dlTxt.innerHTML='Downloaded ✓';
+    toast('Your download has started ✓','ok');
+
+  } catch(err){
+    pfill.style.width='0%';
+    pfill.classList.remove('indeterminate');
+    pmsg.textContent='Failed';
+    toast(err.message,'err');
+  } finally{
     setTimeout(()=>{
       btn.disabled=false;
       prog.classList.remove('on');
       pfill.style.width='0%';
-      pfill.className='prog-fill';
+      ppct.textContent='';
       renderGrids();
-    },3000);
-  }, 8000);
+    },2200);
+  }
 }
 
 /* ════════════════════════════════════════════
