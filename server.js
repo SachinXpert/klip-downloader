@@ -1,9 +1,7 @@
 /**
- * KLIP — Custom Video Downloader Backend v5
- * Engine: yt-dlp + ffmpeg
- * Key fix: --print instead of --dump-json for info
- * (--dump-json validates formats internally and fails on some videos;
- *  --print skips format selection entirely — much more reliable)
+ * KLIP — Video Downloader Backend v7
+ * Permanent fix: retry mechanism + multiple client fallbacks
+ * No cookies dependency for normal videos
  */
 
 const express    = require('express');
@@ -18,42 +16,90 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-/* ─── AUTO-UPDATE yt-dlp ON STARTUP ─────────────────────── */
-console.log('[INIT] Updating yt-dlp to latest…');
+/* ─── AUTO-UPDATE ────────────────────────────────────────── */
+console.log('[INIT] Updating yt-dlp…');
 try {
   execSync('yt-dlp -U 2>&1', { timeout: 60000 });
   const ver = execSync('yt-dlp --version').toString().trim();
   console.log('[INIT] yt-dlp', ver, '✓');
-} catch (e) {
-  console.warn('[INIT] yt-dlp update skipped:', e.message.slice(0,80));
-}
+} catch (e) { console.warn('[INIT]', e.message.slice(0, 80)); }
 
-/* ─── COOKIES ────────────────────────────────────────────── */
+/* ─── COOKIES (optional — only for age-restricted content) ── */
 let COOKIES_PATH = null;
 if (process.env.YT_COOKIES) {
   COOKIES_PATH = path.join(os.tmpdir(), 'klip-cookies.txt');
   fs.writeFileSync(COOKIES_PATH, process.env.YT_COOKIES);
-  console.log('[COOKIES] Loaded from env ✓');
+  console.log('[COOKIES] Env loaded (age-restricted support ✓)');
 } else if (fs.existsSync(path.join(__dirname, 'cookies.txt'))) {
   COOKIES_PATH = path.join(__dirname, 'cookies.txt');
-  console.log('[COOKIES] Loaded from file ✓');
+  console.log('[COOKIES] File loaded (age-restricted support ✓)');
 } else {
-  console.log('[COOKIES] None — iOS client fallback');
+  console.log('[COOKIES] None — normal videos work without cookies');
 }
 
-/* ─── ANTI-BOT ARGS ──────────────────────────────────────── */
-function antiBotArgs() {
-  // tv_embedded = YouTube's client for third-party embedded players.
-  // Minimal bot-checks, works on cloud/datacenter IPs WITHOUT cookies.
-  // ios = fallback client for anything tv_embedded can't reach.
-  //
-  // Cookies are now OPTIONAL — only needed for age-restricted videos.
-  // Normal videos work permanently with just tv_embedded + ios.
-  const args = [
-    '--extractor-args', 'youtube:player_client=tv_embedded,ios',
+/* ─── yt-dlp PROMISE WRAPPER ─────────────────────────────── */
+function ytdlp(args, timeoutMs = 60000) {
+  return new Promise(resolve => {
+    let out = '', err = '';
+    const proc = spawn('yt-dlp', args);
+    proc.stdout.on('data', d => out += d);
+    proc.stderr.on('data', d => err += d);
+    proc.on('close', code => resolve({ code, out, err }));
+    proc.on('error', e  => resolve({ code: -1, out: '', err: e.message }));
+    setTimeout(() => { try { proc.kill(); } catch {} }, timeoutMs);
+  });
+}
+
+/* ─── ATTEMPT STRATEGIES ─────────────────────────────────── */
+// Each strategy is tried in order until one succeeds.
+// This makes the server permanently resilient:
+//  - No cookies? tv_embedded handles it.
+//  - Expired cookies? No-cookies strategies still work.
+//  - tv_embedded blocked? ios or android_creator fallback.
+function infoStrategies(url) {
+  const base = [
+    '--dump-json',
+    '--no-playlist',
+    '--no-warnings',
+    '--skip-download',
+    // "b/w" = best, or if nothing else worst — ALWAYS matches something
+    '-f', 'b/w',
   ];
-  if (COOKIES_PATH) args.push('--cookies', COOKIES_PATH);
-  return args;
+  const strategies = [
+    // 1. tv_embedded — minimal bot-check, works on cloud IPs
+    [...base, '--extractor-args', 'youtube:player_client=tv_embedded', url],
+    // 2. tv_embedded + ios fallback
+    [...base, '--extractor-args', 'youtube:player_client=tv_embedded,ios', url],
+    // 3. android_creator — different auth path
+    [...base, '--extractor-args', 'youtube:player_client=android_creator', url],
+    // 4. ios alone
+    [...base, '--extractor-args', 'youtube:player_client=ios', url],
+    // 5. With cookies (if available) + tv_embedded
+    ...(COOKIES_PATH ? [
+      [...base, '--extractor-args', 'youtube:player_client=tv_embedded,web', '--cookies', COOKIES_PATH, url],
+    ] : []),
+  ];
+  return strategies;
+}
+
+function downloadStrategies(url, fmtString, outTpl, extra = []) {
+  const base = [
+    '-f', fmtString,
+    '--no-playlist',
+    '--no-warnings',
+    ...extra,
+    '-o', outTpl,
+  ];
+  const strategies = [
+    [...base, '--extractor-args', 'youtube:player_client=tv_embedded', url],
+    [...base, '--extractor-args', 'youtube:player_client=tv_embedded,ios', url],
+    [...base, '--extractor-args', 'youtube:player_client=android_creator', url],
+    [...base, '--extractor-args', 'youtube:player_client=ios', url],
+    ...(COOKIES_PATH ? [
+      [...base, '--extractor-args', 'youtube:player_client=tv_embedded,web', '--cookies', COOKIES_PATH, url],
+    ] : []),
+  ];
+  return strategies;
 }
 
 /* ─── HELPERS ────────────────────────────────────────────── */
@@ -84,43 +130,27 @@ function findFile(p) {
 }
 function cleanup(f) { try { if(f&&fs.existsSync(f)) fs.unlinkSync(f); } catch {} }
 
-const BPS = {2160:35000,1440:16000,1080:8000,720:5000,480:2500,360:1000};
-function estBytes(h,d) { return Math.round(((BPS[h]||1500)*1000/8)*(d||0)); }
-
-function heightOf(f) {
-  if (!f?.height) return null;
-  return Math.min(f.height, f.width||f.height);
-}
-// Standard YouTube resolution heights — only these are shown in the UI.
-// Non-standard yt-dlp format variants (428p, 960p, etc.) get mapped
-// to the nearest standard or dropped.
-const STD_H = new Set([144, 240, 360, 480, 720, 1080, 1440, 2160]);
-
+const STD_H = new Set([144,240,360,480,720,1080,1440,2160]);
 function heightOf(f) {
   if (!f) return null;
-
-  // 1. format_note is the authoritative label YouTube assigns each stream
-  //    e.g. "1080p", "1080p60", "2160p", "720p", "480p", "360p", "144p"
-  //    This avoids the width-vs-height confusion entirely.
   if (f.format_note) {
     const m = String(f.format_note).match(/^(\d+)p/);
     if (m) return parseInt(m[1]);
   }
-
-  // 2. Fall back to geometry — always use the SHORTER side for the "p" label
-  const h = f.height || 0;
-  const w = f.width  || 0;
-  if (h && w) return Math.min(h, w);
-  return h || null;
+  const h = f.height||0, w = f.width||0;
+  if (h && w) return Math.min(h,w);
+  return h||null;
 }
+const BPS = {2160:35000,1440:16000,1080:8000,720:5000,480:2500,360:1000};
+function estBytes(h,d) { return Math.round(((BPS[h]||1500)*1000/8)*(d||0)); }
+
 function publicError(s) {
-  if (/Sign in|bot|verif/i.test(s))    return 'This video is temporarily unavailable. Please try again shortly.';
-  if (/Private video/i.test(s))         return 'This video is private.';
-  if (/unavailable|removed/i.test(s))   return 'This video is unavailable or has been removed.';
-  if (/age.?restrict/i.test(s))         return 'This video is age-restricted.';
-  if (/429/i.test(s))                   return 'Too many requests — please wait a moment.';
-  if (/copyright|blocked/i.test(s))     return 'This video is blocked for copyright reasons.';
-  if (/format.*not available/i.test(s)) return 'This quality is unavailable — please try a lower resolution.';
+  if (/Sign in|bot|verif/i.test(s))   return 'This video is temporarily unavailable. Please try again.';
+  if (/Private video/i.test(s))        return 'This video is private.';
+  if (/unavailable|removed/i.test(s))  return 'This video is unavailable or has been removed.';
+  if (/age.?restrict/i.test(s))        return 'This video is age-restricted.';
+  if (/429/i.test(s))                  return 'Too many requests — please wait a moment.';
+  if (/copyright|blocked/i.test(s))    return 'This video is blocked for copyright reasons.';
   return 'Could not process this video. Please try a different link.';
 }
 
@@ -134,250 +164,205 @@ function rateLimit(req,res,next) {
 }
 
 /* ─── POST /api/info ─────────────────────────────────────── */
-// THE FIX: use --print with a JSON template instead of --dump-json.
-// --dump-json internally validates the selected format, causing
-// "format not available" on many videos. --print skips all
-// format selection and just extracts raw metadata fields.
-app.post('/api/info', (req, res) => {
+app.post('/api/info', async (req, res) => {
   const { url } = req.body;
   if (!url || !isYouTube(url))
     return res.status(400).json({ error: 'Please enter a valid YouTube link.' });
 
-  // Build a JSON string directly in the yt-dlp template.
-  // %(field)j → JSON-encoded value (null if missing).
-  // %(uploader|channel)j → uploader, falling back to channel name.
-  const tpl = [
-    '{"id":%(id)j',
-    '"title":%(title)j',
-    '"author":%(uploader|channel)j',
-    '"thumbnail":%(thumbnail)j',
-    '"duration":%(duration)j',
-    '"view_count":%(view_count)j',
-    '"formats":%(formats)j}'
-  ].join(',');
-
-  let out='', err='';
-  const args = [
-    '--print', tpl,
-    '--no-warnings',
-    '--skip-download',
-    '--no-playlist',
-    ...antiBotArgs(),
-    url
-  ];
-
   console.log('[INFO] Fetching:', url);
-  const proc = spawn('yt-dlp', args);
-  proc.stdout.on('data', d => out += d);
-  proc.stderr.on('data', d => err += d);
+  const strategies = infoStrategies(url);
+  let lastErr = '';
 
-  proc.on('close', code => {
-    if (code !== 0) {
-      console.error('[INFO FAIL]', err.slice(-600));
-      return res.status(404).json({ error: publicError(err) });
-    }
-    try {
-      const v = JSON.parse(out.trim());
-      const dur = v.duration || 0;
+  for (let i = 0; i < strategies.length; i++) {
+    const { code, out, err } = await ytdlp(strategies[i], 50000);
+    if (code === 0 && out.trim()) {
+      try {
+        const v = JSON.parse(out.trim());
+        const dur = v.duration || 0;
 
-      // Build quality list from real formats — standard heights only.
-      // format_note ensures we get labels YouTube actually uses (1080p, 720p…)
-      // rather than raw pixel dimensions (1920, 1280…).
-      const sizeMap = {};
-      let bestAudioBytes = 0; // audio stream added to each video size below
+        const sizeMap = {};
+        let bestAudioBytes = 0;
 
-      (v.formats||[]).forEach(f => {
-        const isVideoOnly = f.vcodec && f.vcodec !== 'none';
-        const isAudioOnly = (!f.vcodec || f.vcodec === 'none') && f.acodec && f.acodec !== 'none';
+        (v.formats||[]).forEach(f => {
+          const isVid = f.vcodec && f.vcodec !== 'none';
+          const isAud = (!f.vcodec||f.vcodec==='none') && f.acodec && f.acodec !== 'none';
+          if (isAud) {
+            const sz = f.filesize||f.filesize_approx||0;
+            if (sz > bestAudioBytes) bestAudioBytes = sz;
+            return;
+          }
+          if (!isVid) return;
+          const h = heightOf(f); if (!h) return;
+          if (!STD_H.has(h)) return;
+          const sz = f.filesize||f.filesize_approx||0;
+          if (!sizeMap[h]||sz>sizeMap[h]) sizeMap[h]=sz;
+        });
 
-        if (isAudioOnly) {
-          const sz = f.filesize || f.filesize_approx || 0;
-          if (sz > bestAudioBytes) bestAudioBytes = sz;
-          return;
+        if (!Object.keys(sizeMap).length) {
+          (v.formats||[]).forEach(f => {
+            if (!f.vcodec||f.vcodec==='none') return;
+            const h = heightOf(f); if (!h) return;
+            const sz = f.filesize||f.filesize_approx||0;
+            if (!sizeMap[h]||sz>sizeMap[h]) sizeMap[h]=sz;
+          });
         }
 
-        if (!isVideoOnly) return;
-        const h = heightOf(f); if (!h) return;
+        let qualities = Object.keys(sizeMap).map(Number).sort((a,b)=>b-a)
+          .map(h => ({
+            height: h,
+            bytes: (sizeMap[h]||estBytes(h,dur)) + (bestAudioBytes||Math.round((192000/8)*dur))
+          }));
 
-        // Only standard heights — skip non-standard variants (428p, 960p, etc.)
-        if (!STD_H.has(h)) return;
+        if (!qualities.length)
+          qualities = [1080,720,480,360].map(h=>({height:h,bytes:estBytes(h,dur)}));
 
-        const sz = f.filesize || f.filesize_approx || 0;
-        if (!sizeMap[h] || sz > sizeMap[h]) sizeMap[h] = sz;
-      });
+        const audioSizes={};
+        [320,256,128].forEach(k=>{audioSizes[k]=Math.round((k*1000/8)*dur);});
 
-      // If no standard heights detected, fall back to all heights
-      if (!Object.keys(sizeMap).length) {
-        (v.formats||[]).forEach(f => {
-          if (!f.vcodec || f.vcodec === 'none') return;
-          const h = heightOf(f); if (!h) return;
-          const sz = f.filesize || f.filesize_approx || 0;
-          if (!sizeMap[h] || sz > sizeMap[h]) sizeMap[h] = sz;
+        console.log(`[INFO OK] strategy ${i+1} — "${v.title}" — up to ${qualities[0].height}p`);
+        return res.json({
+          id: v.id, title: v.title,
+          author: v.uploader||v.channel||'Unknown',
+          thumbnail: v.thumbnail,
+          duration: fmtTime(dur), views: fmtViews(v.view_count),
+          isShort: dur>0&&dur<=60,
+          qualities, audioSizes
         });
+      } catch(e) {
+        lastErr = 'Parse error: ' + e.message;
+        console.warn(`[INFO] Strategy ${i+1} parse failed:`, e.message);
+        continue;
       }
-
-      let qualities = Object.keys(sizeMap).map(Number)
-        .sort((a,b) => b-a)
-        .map(h => ({
-          height: h,
-          // Combined size = video stream + audio stream (what yt-dlp actually downloads)
-          bytes: (sizeMap[h] || estBytes(h,dur)) + (bestAudioBytes || Math.round((192000/8)*dur))
-        }));
-
-      if (!qualities.length)
-        qualities = [1080,720,480,360].map(h=>({height:h, bytes:estBytes(h,dur)}));
-
-      const audioSizes={};
-      [320,256,128].forEach(k=>{audioSizes[k]=Math.round((k*1000/8)*dur);});
-
-      console.log(`[INFO OK] "${v.title}" — up to ${qualities[0].height}p (${qualities.length} qualities)`);
-      res.json({
-        id:        v.id,
-        title:     v.title,
-        author:    v.author||'Unknown',
-        thumbnail: v.thumbnail,
-        duration:  fmtTime(dur),
-        views:     fmtViews(v.view_count),
-        isShort:   dur>0&&dur<=60,
-        qualities,
-        audioSizes
-      });
-    } catch(e) {
-      console.error('[INFO PARSE]', e.message, '\nRAW OUTPUT:', out.slice(0,300));
-      res.status(500).json({ error: 'Could not read video info — please try again.' });
     }
-  });
-  proc.on('error', e => {
-    console.error('[INFO SPAWN]', e.message);
-    res.status(500).json({ error: 'Something went wrong — please try again.' });
-  });
+    lastErr = err;
+    console.warn(`[INFO] Strategy ${i+1} failed (code ${code}):`, err.slice(-150));
+  }
+
+  console.error('[INFO] All strategies failed:', lastErr.slice(-300));
+  res.status(404).json({ error: publicError(lastErr) });
 });
 
 /* ─── GET /api/download ──────────────────────────────────── */
-app.get('/api/download', rateLimit, (req, res) => {
+app.get('/api/download', rateLimit, async (req, res) => {
   const { url, quality, mode, bitrate } = req.query;
   if (!url||!isYouTube(decodeURIComponent(url)))
     return res.status(400).json({ error: 'Invalid link.' });
 
-  const ytUrl=decodeURIComponent(url), isAudio=mode==='audio';
-  const id=uid(), outTpl=path.join(os.tmpdir(),`klip-${id}.%(ext)s`);
+  const ytUrl   = decodeURIComponent(url);
+  const isAudio = mode === 'audio';
+  const id      = uid();
+  const outTpl  = path.join(os.tmpdir(), `klip-${id}.%(ext)s`);
 
-  let args;
+  let fmtString, extra;
   if (isAudio) {
-    const aqMap={'320':'0','256':'2','128':'5'};
-    args=['-f','bestaudio/best',
-      '--extract-audio','--audio-format','mp3',
-      '--audio-quality',aqMap[bitrate]||'0',
-      '--no-playlist','--no-warnings',
-      ...antiBotArgs(),'-o',outTpl,ytUrl];
+    const aqMap = {'320':'0','256':'2','128':'5'};
+    fmtString = 'bestaudio/best';
+    extra = [
+      '--extract-audio', '--audio-format', 'mp3',
+      '--audio-quality', aqMap[bitrate]||'0',
+    ];
   } else {
-    const h=parseInt(quality)||1080;
-    // Permissive format chain — no [ext=mp4] restrictions
-    const fmt=[
+    const h = parseInt(quality)||1080;
+    fmtString = [
       `bestvideo[height<=${h}]+bestaudio`,
       `bestvideo[height<=${h}]`,
       `best[height<=${h}]`,
       'best'
     ].join('/');
-    args=['-f',fmt,'--merge-output-format','mp4',
-      '--no-playlist','--no-warnings',
-      ...antiBotArgs(),'-o',outTpl,ytUrl];
+    extra = ['--merge-output-format', 'mp4'];
   }
 
-  const label=isAudio?`MP3 ${bitrate}k`:`${quality}p MP4`;
-  console.log(`[DL START] ${label}`);
+  const label = isAudio ? `MP3 ${bitrate}k` : `${quality}p`;
+  console.log(`[DL START] ${label} — ${ytUrl}`);
 
-  const proc=spawn('yt-dlp',args);
-  let stderr='';
-  proc.stderr.on('data',d=>{stderr+=d;});
+  const strategies = downloadStrategies(ytUrl, fmtString, outTpl, extra);
 
-  proc.on('close',code=>{
-    if(code!==0){
-      console.error(`[DL FAIL] ${label}\n`,stderr.slice(-600));
-      if(!res.headersSent) res.status(500).json({error:publicError(stderr)});
+  for (let i = 0; i < strategies.length; i++) {
+    const { code, err } = await ytdlp(strategies[i], 300000); // 5 min timeout for big files
+    if (code === 0) {
+      const outFile = findFile(`klip-${id}`);
+      if (!outFile) continue;
+
+      const stat  = fs.statSync(outFile);
+      const ext   = path.extname(outFile).slice(1)||(isAudio?'mp3':'mp4');
+      const ctype = ext==='mp3'?'audio/mpeg':'video/mp4';
+      const fname = `klip-${isAudio?'audio':quality+'p'}.${ext}`;
+
+      console.log(`[DL DONE] strategy ${i+1} — ${fname} — ${(stat.size/1048576).toFixed(1)} MB`);
+      res.setHeader('Content-Disposition',`attachment; filename="${fname}"`);
+      res.setHeader('Content-Type',ctype);
+      res.setHeader('Content-Length',stat.size);
+
+      const stream = fs.createReadStream(outFile);
+      stream.pipe(res);
+      stream.on('end',  ()=>cleanup(outFile));
+      stream.on('error',()=>cleanup(outFile));
+      req.on('close',   ()=>{stream.destroy();cleanup(outFile);});
       return;
     }
-    const outFile=findFile(`klip-${id}`);
-    if(!outFile) return res.status(500).json({error:'File not created — try again.'});
+    console.warn(`[DL] Strategy ${i+1} failed (code ${code}):`, err.slice(-150));
+    cleanup(findFile(`klip-${id}`));
+  }
 
-    const stat=fs.statSync(outFile);
-    const ext=path.extname(outFile).slice(1)||(isAudio?'mp3':'mp4');
-    const ctype=ext==='mp3'?'audio/mpeg':'video/mp4';
-    const fname=`klip-${isAudio?'audio':quality+'p'}.${ext}`;
-
-    console.log(`[DL DONE] ${fname} — ${(stat.size/1048576).toFixed(1)} MB`);
-    res.setHeader('Content-Disposition',`attachment; filename="${fname}"`);
-    res.setHeader('Content-Type',ctype);
-    res.setHeader('Content-Length',stat.size);
-
-    const stream=fs.createReadStream(outFile);
-    stream.pipe(res);
-    stream.on('end',()=>cleanup(outFile));
-    stream.on('error',()=>cleanup(outFile));
-    req.on('close',()=>{stream.destroy();cleanup(outFile);});
-  });
-  proc.on('error',e=>{
-    console.error('[DL SPAWN]',e.message);
-    if(!res.headersSent) res.status(500).json({error:'Something went wrong — try again.'});
-  });
+  if (!res.headersSent)
+    res.status(500).json({ error: 'Could not download this video. Please try a different quality.' });
 });
 
 /* ─── GET /api/health ────────────────────────────────────── */
 app.get('/api/health',(req,res)=>{
-  let ytdlp='not found',ffmpeg='not found';
-  try{ytdlp=execSync('yt-dlp --version',{timeout:5000}).toString().trim();}catch{}
-  try{ffmpeg=execSync('ffmpeg -version 2>&1',{timeout:5000}).toString().split('\n')[0];}catch{}
-  res.json({status:'online',ytdlp,ffmpeg,
-    cookies:COOKIES_PATH?'loaded ✓':'not set',
-    uptime:Math.floor(process.uptime())+'s'});
+  let ytdlpVer='not found', ffmpegVer='not found';
+  try{ytdlpVer=execSync('yt-dlp --version',{timeout:5000}).toString().trim();}catch{}
+  try{ffmpegVer=execSync('ffmpeg -version 2>&1',{timeout:5000}).toString().split('\n')[0];}catch{}
+  res.json({
+    status:'online', ytdlp:ytdlpVer, ffmpeg:ffmpegVer,
+    cookies: COOKIES_PATH?'loaded (age-restricted support)':'not set (not needed)',
+    uptime: Math.floor(process.uptime())+'s',
+    version:'v7'
+  });
 });
 
 /* ─── GET /api/debug?url=... ─────────────────────────────── */
-app.get('/api/debug',(req,res)=>{
-  const {url}=req.query;
-  if(!url) return res.json({error:'Pass ?url=YOUTUBE_URL'});
+app.get('/api/debug', async (req,res)=>{
+  const {url} = req.query;
+  if (!url) return res.json({error:'Pass ?url=YOUTUBE_URL'});
 
-  const botArgs=antiBotArgs();
-  const tpl=[
-    '{"id":%(id)j','"title":%(title)j','"author":%(uploader|channel)j',
-    '"thumbnail":%(thumbnail)j','"duration":%(duration)j',
-    '"view_count":%(view_count)j','"formats":%(formats)j}'
-  ].join(',');
+  const strategies = infoStrategies(url);
+  const results = [];
 
-  const allArgs=['--print',tpl,'--no-warnings','--skip-download','--no-playlist',...botArgs,url];
-  let out='',err='';
-  const proc=spawn('yt-dlp',allArgs);
-  proc.stdout.on('data',d=>out+=d);
-  proc.stderr.on('data',d=>err+=d);
-  proc.on('close',code=>{
-    let parsed=null;
-    try{
-      const v=JSON.parse(out.trim());
-      parsed={title:v.title,author:v.author,duration:v.duration,
-        formatCount:v.formats?.length,
-        topFormats:v.formats?.slice(0,5).map(f=>({
-          id:f.format_id,height:f.height,
-          vcodec:f.vcodec?.slice(0,10),acodec:f.acodec?.slice(0,10)
-        }))};
-    }catch(e){parsed={parseError:e.message,rawSlice:out.slice(0,200)};}
-    res.json({
-      exitCode:code, stderr:err.slice(-800),
-      parsedInfo:parsed,
-      cookies:COOKIES_PATH?'loaded ✓':'none',
-      fullArgs:allArgs,   // ← shows EVERY arg actually passed to yt-dlp
-      version:'v6'        // tv_embedded permanent fix
+  for (let i = 0; i < strategies.length; i++) {
+    const {code,out,err} = await ytdlp(strategies[i], 30000);
+    let parsed = null;
+    if (code===0) {
+      try {
+        const v = JSON.parse(out.trim());
+        parsed = { title:v.title, formats:v.formats?.length };
+      } catch(e) { parsed = {parseError:e.message}; }
+    }
+    results.push({
+      strategy: i+1,
+      args: strategies[i].filter(a=>!a.includes('cookies')), // hide cookie path
+      exitCode: code,
+      stderr: err.slice(-300),
+      parsedInfo: parsed,
+      success: code===0 && !!parsed?.title
     });
+    if (parsed?.title) break; // stop at first success
+  }
+
+  res.json({
+    version: 'v7',
+    cookies: COOKIES_PATH?'loaded':'not set',
+    results
   });
-  proc.on('error',e=>res.json({spawnError:e.message}));
 });
 
 /* ─── START ──────────────────────────────────────────────── */
-const PORT=process.env.PORT||3001;
+const PORT = process.env.PORT||3001;
 app.listen(PORT,()=>{
   console.log(`
-  ╔══════════════════════════════════════╗
-  ║  KLIP v6 — Port ${PORT}               ║
-  ║  Client : tv_embedded + ios          ║
-  ║  Cookies: ${COOKIES_PATH?'YES (age-restricted ✓)':'NO  (not needed for normal)'}  ║
-  ╚══════════════════════════════════════╝`);
+  ╔══════════════════════════════════════════╗
+  ║  KLIP v7 — Port ${PORT}                   ║
+  ║  Strategies: tv_embedded → ios → android ║
+  ║  Cookies: ${COOKIES_PATH?'YES (optional enhancement)':'NO  (works without them)   '}  ║
+  ╚══════════════════════════════════════════╝`);
 });
