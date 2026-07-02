@@ -43,15 +43,17 @@ if (process.env.YT_COOKIES) {
 
 /* ─── ANTI-BOT ARGS ──────────────────────────────────────── */
 function antiBotArgs() {
-  if (COOKIES_PATH) {
-    // Cookies present → standard web client (most formats) + cookies
-    return ['--cookies', COOKIES_PATH];
-  }
-  // No cookies → iOS client to bypass lighter bot checks
-  return [
-    '--extractor-args', 'youtube:player_client=ios',
-    '--user-agent', 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iPhone OS 17_5_1 like Mac OS X)',
+  // tv_embedded = YouTube's client for third-party embedded players.
+  // Minimal bot-checks, works on cloud/datacenter IPs WITHOUT cookies.
+  // ios = fallback client for anything tv_embedded can't reach.
+  //
+  // Cookies are now OPTIONAL — only needed for age-restricted videos.
+  // Normal videos work permanently with just tv_embedded + ios.
+  const args = [
+    '--extractor-args', 'youtube:player_client=tv_embedded,ios',
   ];
+  if (COOKIES_PATH) args.push('--cookies', COOKIES_PATH);
+  return args;
 }
 
 /* ─── HELPERS ────────────────────────────────────────────── */
@@ -363,7 +365,7 @@ app.get('/api/debug',(req,res)=>{
       parsedInfo:parsed,
       cookies:COOKIES_PATH?'loaded ✓':'none',
       fullArgs:allArgs,   // ← shows EVERY arg actually passed to yt-dlp
-      version:'v5'        // ← confirm new code is running
+      version:'v6'        // tv_embedded permanent fix
     });
   });
   proc.on('error',e=>res.json({spawnError:e.message}));
@@ -374,8 +376,8 @@ const PORT=process.env.PORT||3001;
 app.listen(PORT,()=>{
   console.log(`
   ╔══════════════════════════════════════╗
-  ║  KLIP v5 — Port ${PORT}               ║
-  ║  Cookies : ${COOKIES_PATH?'YES ✓':'NO  (iOS fallback)'}           ║
-  ║  Fix     : --print (no fmt select)  ║
+  ║  KLIP v6 — Port ${PORT}               ║
+  ║  Client : tv_embedded + ios          ║
+  ║  Cookies: ${COOKIES_PATH?'YES (age-restricted ✓)':'NO  (not needed for normal)'}  ║
   ╚══════════════════════════════════════╝`);
 });
